@@ -8,7 +8,7 @@ use axum::{
 };
 use rand::Rng;
 use scansend_proto::{
-    ApiError, CancelRequest, ConnectRequest, Info, PairRequest, PairResponse, Scan, CONNECT_WAIT_SECS, MAX_SCAN_LEN,
+    ApiError, CancelRequest, ConnectRequest, Info, PairRequest, PairResponse, RenameRequest, Scan, CONNECT_WAIT_SECS, MAX_SCAN_LEN,
     PROTOCOL_VERSION,
 };
 use std::collections::VecDeque;
@@ -174,6 +174,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/api/v1/connect/cancel", post(cancel_connect))
         .route("/api/v1/scan", post(scan))
         .route("/api/v1/disconnect", post(disconnect))
+        .route("/api/v1/rename", post(rename))
         .layer(DefaultBodyLimit::max(MAX_SCAN_LEN * 2))
         .with_state(state)
 }
@@ -329,9 +330,42 @@ async fn disconnect(State(s): State<Arc<AppState>>, headers: HeaderMap) -> Respo
     StatusCode::NO_CONTENT.into_response()
 }
 
+/// Give the phone with this token a new name. Returns false if the token is unknown.
+fn set_device_name(s: &AppState, token: &str, name: &str) -> bool {
+    let name: String = name.chars().filter(|c| !c.is_control()).take(64).collect();
+    let name = name.trim();
+    let hash = config::hash_token(token);
+    let mut cfg = s.cfg.lock().unwrap();
+    let Some(d) = cfg.devices.iter_mut().find(|d| d.token_sha256 == hash) else { return false };
+    if name.is_empty() || d.name == name {
+        return true;
+    }
+    println!("  \"{}\" is now called \"{name}\".", d.name);
+    d.name = name.to_string();
+    if let Err(e) = cfg.save() {
+        eprintln!("  ! could not save: {e:#}");
+    }
+    drop(cfg);
+    (s.on_change)();
+    true
+}
+
+/// The phone changed its name in its settings.
+async fn rename(State(s): State<Arc<AppState>>, headers: HeaderMap, Json(req): Json<RenameRequest>) -> Response {
+    if set_device_name(&s, bearer(&headers), &req.device_name) {
+        StatusCode::NO_CONTENT.into_response()
+    } else {
+        err(StatusCode::UNAUTHORIZED, "not paired")
+    }
+}
+
 async fn scan(State(s): State<Arc<AppState>>, headers: HeaderMap, Json(scan): Json<Scan>) -> Response {
     mark_seen(&s);
     let token = bearer(&headers);
+    // Catch up on a rename the computer missed (it was off, or on another network).
+    if let Some(name) = scan.device_name.as_deref() {
+        set_device_name(&s, token, name);
+    }
     let Some(device) = s.cfg.lock().unwrap().device_for_token(token).map(|d| d.name.clone()) else {
         return err(StatusCode::UNAUTHORIZED, "not paired");
     };

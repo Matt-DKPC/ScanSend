@@ -102,13 +102,13 @@
   .list .forget { margin-left: 10px; }
   .list button.on { border-color: var(--accent); }
   /* While searching: a scan line sweeping over a little barcode. */
-  .sweep { display: inline-block; position: relative; width: 30px; height: 13px; margin-left: 8px;
-    vertical-align: -1px; overflow: hidden; opacity: 0; transition: opacity .25s; }
+  .sweep { display: inline-block; position: relative; width: 46px; height: 20px; margin-left: 10px;
+    vertical-align: -5px; overflow: hidden; opacity: 0; transition: opacity .25s; }
   .sweep.on { opacity: 1; }
   .sweep svg { width: 100%; height: 100%; color: var(--dim); display: block; }
-  .sweep i { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--accent);
+  .sweep i { position: absolute; top: -2px; bottom: -2px; left: 0; width: 3px; background: var(--accent);
     box-shadow: 0 0 6px var(--accent); animation: sweep 1.1s ease-in-out infinite alternate; }
-  @keyframes sweep { to { left: calc(100% - 2px); } }
+  @keyframes sweep { to { left: calc(100% - 3px); } }
   #startScan { margin: 10px 0 12px; }
 
   /* ---- scan page ---- */

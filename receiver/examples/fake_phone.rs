@@ -43,7 +43,7 @@ async fn main() -> anyhow::Result<()> {
             let r = http
                 .post(format!("{base}/api/v1/scan"))
                 .bearer_auth(&pair.token)
-                .json(&Scan { text: text.clone(), format: Some("QR_CODE".into()), id: Some(format!("t{i}")) })
+                .json(&Scan { text: text.clone(), format: Some("QR_CODE".into()), id: Some(format!("t{i}")), device_name: None })
                 .send()
                 .await?;
             println!("scan {text:?} -> {}", r.status());
@@ -54,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
     let r = http
         .post(format!("{base}/api/v1/scan"))
         .bearer_auth("nope")
-        .json(&Scan { text: "x".into(), format: None, id: None })
+        .json(&Scan { text: "x".into(), format: None, id: None, device_name: None })
         .send()
         .await?;
     println!("bad token -> {}", r.status());

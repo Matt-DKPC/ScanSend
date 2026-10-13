@@ -355,8 +355,26 @@ fn set_device_name(name: String, state: State<'_, AppState>) -> Result<PublicSta
         let new = if name.is_empty() { random_name(&computer_names(&s)) } else { name.chars().take(64).collect() };
         s.device_name = Some(new);
         state.save(&s)?;
+        tell_computers_new_name(&s);
     }
     Ok(state.public())
+}
+
+/// Let every paired computer know this phone's new name right away, in the
+/// background (scans also carry the name, for computers that were off).
+fn tell_computers_new_name(s: &Saved) {
+    let Some(name) = s.device_name.clone() else { return };
+    for r in s.receivers.clone() {
+        let name = name.clone();
+        tauri::async_runtime::spawn(async move {
+            let _ = http()
+                .post(format!("http://{}:{}/api/v1/rename", r.host, r.port))
+                .bearer_auth(&r.token)
+                .json(&RenameRequest { device_name: name })
+                .send()
+                .await;
+        });
+    }
 }
 
 #[tauri::command]
@@ -365,6 +383,7 @@ fn randomize_device_name(state: State<'_, AppState>) -> Result<PublicState, Stri
         let mut s = state.saved.lock().unwrap();
         s.device_name = Some(random_name(&computer_names(&s)));
         state.save(&s)?;
+        tell_computers_new_name(&s);
     }
     Ok(state.public())
 }
@@ -576,7 +595,8 @@ async fn send_scan(text: String, format: Option<String>, state: State<'_, AppSta
     };
     let mut idb = [0u8; 8];
     rand::rng().fill_bytes(&mut idb);
-    let scan = Scan { text, format, id: Some(hex::encode(idb)) };
+    let device_name = state.saved.lock().unwrap().device_name.clone();
+    let scan = Scan { text, format, id: Some(hex::encode(idb)), device_name };
 
     let post = |host: String, port: u16| {
         let scan = scan.clone();

@@ -20,6 +20,7 @@
 //!   POST /api/v1/connect/cancel  CancelRequest  -> 204
 //!   POST /api/v1/scan  Scan  (Bearer token)   -> 204
 //!   POST /api/v1/disconnect  (Bearer token)   -> 204  (phone tapped Forget)
+//!   POST /api/v1/rename  RenameRequest (Bearer token) -> 204  (phone changed its name)
 //!   GET  /api/v1/info                         -> Info
 //!
 //! Older PIN pairing (hidden in the apps for now, kept in case it's needed):
@@ -115,6 +116,16 @@ pub struct Scan {
     /// Random id per scan so a retried request is not typed twice.
     #[serde(default)]
     pub id: Option<String>,
+    /// The phone's current name, so the computer catches up if it was renamed
+    /// while the computer was off.
+    #[serde(default)]
+    pub device_name: Option<String>,
+}
+
+/// The phone was renamed (POST /api/v1/rename, with its token).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RenameRequest {
+    pub device_name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
