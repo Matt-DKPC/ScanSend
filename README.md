@@ -51,14 +51,14 @@ Get the latest from the **[Releases page](../../releases/latest)**:
 | Device | File | Notes |
 |---|---|---|
 | Android phone | `ScanSend-…-android.apk` | Open it on the phone to install. Updates install over 0.4.0 and newer; uninstall a 0.3.x version once first. |
-| Windows computer | `ScanSend-…-windows-x64.exe` | Just run it. Allow it on **Private networks** when Windows asks. |
+| Windows computer | `ScanSend-…-windows-setup.exe` | Installs ScanSend and allows it through Windows Firewall, so it never asks. (`…-windows-x64.exe` runs without installing.) |
 | Linux computer | `ScanSend-…-linux-x64` | `chmod +x` it, then run it. |
 | iPhone | — | Not on the App Store yet; build it on a Mac (below). |
 | Mac computer | — | Build it from source for now (below). |
 
 The phone and computer need to be on the **same Wi-Fi network**. ScanSend uses
-**UDP 53318** (finding computers) and **TCP 53319** (scans). On Linux, the window offers to open
-these in the firewall for you; on Windows, allow it when asked.
+**UDP 53318** (finding computers) and **TCP 53319** (scans). The Windows installer opens these
+for ScanSend (local network only); on Linux, the window offers to open them for you.
 
 ## Settings on the computer
 

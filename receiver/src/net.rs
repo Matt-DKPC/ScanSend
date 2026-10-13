@@ -130,6 +130,23 @@ impl Firewall {
     /// without admin rights; for the others this returns false.
     pub fn ports_open(self, http_port: u16) -> bool {
         let udp = scansend_proto::DISCOVERY_PORT;
+        if self == Firewall::Windows {
+            // The installer adds "ScanSend"; the in-app fix adds "ScanSend TCP" / "ScanSend UDP".
+            // Reading rules doesn't need admin rights.
+            let has_rule = |name: &str| {
+                let mut c = Command::new("netsh");
+                c.args(["advfirewall", "firewall", "show", "rule", &format!("name={name}")])
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null());
+                #[cfg(windows)]
+                {
+                    use std::os::windows::process::CommandExt;
+                    c.creation_flags(0x0800_0000); // CREATE_NO_WINDOW: no console flash
+                }
+                c.status().map(|s| s.success()).unwrap_or(false)
+            };
+            return has_rule("ScanSend") || (has_rule("ScanSend TCP") && has_rule("ScanSend UDP"));
+        }
         self == Firewall::Firewalld
             && [format!("--query-port={http_port}/tcp"), format!("--query-port={udp}/udp")].iter().all(|arg| {
                 Command::new("firewall-cmd")

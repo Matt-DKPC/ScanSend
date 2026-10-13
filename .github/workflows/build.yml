@@ -27,6 +27,25 @@ jobs:
         with:
           name: ${{ matrix.name }}
           path: ${{ matrix.name }}
+      # The installer adds a Windows Firewall rule while it has admin rights, so the
+      # app itself never has to ask (see installer/windows/ScanSend.iss).
+      - name: Build the Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $v = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"' | Select-Object -First 1).Matches[0].Groups[1].Value
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) {
+            choco install innosetup -y --no-progress | Out-Null
+            $env:PATH += ";${env:ProgramFiles(x86)}\Inno Setup 6"
+          }
+          iscc "/DAppVersion=$v" "/DSourceExe=$PWD\target\release\scansend.exe" "/DOutputDir=$PWD\setup-out" installer\windows\ScanSend.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-ChildItem setup-out
+      - if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: scansend-windows-setup
+          path: setup-out/*.exe
 
   android:
     runs-on: ubuntu-latest
@@ -116,13 +135,16 @@ jobs:
             exit 0
           fi
           mkdir out
+          cp artifacts/scansend-windows-setup/*.exe out/
           cp artifacts/scansend-windows-x64.exe/scansend-windows-x64.exe "out/ScanSend-$v-windows-x64.exe"
           cp artifacts/scansend-linux-x64/scansend-linux-x64 "out/ScanSend-$v-linux-x64"
           cp "$(find artifacts/scansend-android-apk -name '*.apk' | head -1)" "out/ScanSend-$v-android.apk"
           cat > notes.md <<NOTES
           **Phone (Android):** download \`ScanSend-$v-android.apk\` on the phone and open it. It installs over ScanSend 0.4.0 or newer; if you have 0.3.x, uninstall that once first.
 
-          **Computer:** run \`ScanSend-$v-windows-x64.exe\` on Windows. On Linux, make it runnable first: \`chmod +x ScanSend-$v-linux-x64\`.
+          **Windows:** run \`ScanSend-$v-windows-setup.exe\` (recommended): it installs ScanSend and allows it through Windows Firewall, so it never has to ask. Or run \`ScanSend-$v-windows-x64.exe\` directly without installing.
+
+          **Linux:** make it runnable first: \`chmod +x ScanSend-$v-linux-x64\`, then run it.
 
           **iPhone:** not on the App Store yet; it can be built from source on a Mac (see the README).
           NOTES
