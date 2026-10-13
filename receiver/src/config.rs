@@ -18,6 +18,9 @@ pub struct Config {
     /// Random friendly name ("Flaky USB") shown on phones, picked on first run.
     #[serde(default)]
     pub name: Option<String>,
+    /// Window theme ("default", "wayland", "grape"…), the same names as the phone app's.
+    #[serde(default)]
+    pub theme: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,7 +57,7 @@ impl Config {
         if let Ok(text) = std::fs::read_to_string(&p) {
             return serde_json::from_str(&text).with_context(|| format!("reading {}", p.display()));
         }
-        let cfg = Config { id: random_hex(8), devices: vec![], options: Default::default(), firewall_asked: false, name: None };
+        let cfg = Config { id: random_hex(8), devices: vec![], options: Default::default(), firewall_asked: false, name: None, theme: None };
         cfg.save()?;
         Ok(cfg)
     }

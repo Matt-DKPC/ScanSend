@@ -7,31 +7,65 @@ use crate::net::{self, Firewall};
 use crate::server::AppState;
 use eframe::egui::{self, Color32, RichText};
 use std::net::IpAddr;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
-// The phone app's default theme (Forest Green), so both sides look like one product.
-const ACCENT: Color32 = Color32::from_rgb(61, 220, 151); // text highlights
-const FILL: Color32 = Color32::from_rgb(47, 158, 98); // buttons, borders
-const INK: Color32 = Color32::from_rgb(3, 21, 11); // text on FILL
-const BG: Color32 = Color32::from_rgb(10, 18, 14);
-const PANEL: Color32 = Color32::from_rgb(17, 28, 22);
-const LINE: Color32 = Color32::from_rgb(33, 51, 41);
-const TEXT: Color32 = Color32::from_rgb(230, 239, 233);
-const DIM: Color32 = Color32::from_rgb(134, 154, 142);
+/// The phone app's themes, with the same names and colors, so both sides look like one product.
+#[derive(Clone, Copy)]
+struct Theme {
+    key: &'static str,
+    name: &'static str,
+    bg: Color32,
+    panel: Color32,
+    line: Color32,
+    text: Color32,
+    dim: Color32,
+    /// Highlights, buttons and borders.
+    accent: Color32,
+    /// Text on an accent-filled button.
+    ink: Color32,
+}
+
+const fn hex(c: u32) -> Color32 {
+    Color32::from_rgb((c >> 16) as u8, (c >> 8) as u8, c as u8)
+}
+
+#[rustfmt::skip]
+const THEMES: [Theme; 7] = [
+    Theme { key: "default", name: "Forest Green", bg: hex(0x0a120e), panel: hex(0x111c16), line: hex(0x213329), text: hex(0xe6efe9), dim: hex(0x869a8e), accent: hex(0x2f9e62), ink: hex(0x03150b) },
+    Theme { key: "david", name: "David Green", bg: hex(0x0d1210), panel: hex(0x151c19), line: hex(0x26332d), text: hex(0xe8efeb), dim: hex(0x8b9a93), accent: hex(0x2ef27a), ink: hex(0x032010) },
+    Theme { key: "wayland", name: "Wayland Blue", bg: hex(0x0c1118), panel: hex(0x141b25), line: hex(0x253244), text: hex(0xe8eef5), dim: hex(0x8a97a8), accent: hex(0x3b9cff), ink: hex(0x03152b) },
+    Theme { key: "grape", name: "Grape Purple", bg: hex(0x110d18), panel: hex(0x1a1424), line: hex(0x2e2440), text: hex(0xeee8f5), dim: hex(0x9a8fab), accent: hex(0xa77bff), ink: hex(0x14062b) },
+    Theme { key: "ember", name: "Ember Orange", bg: hex(0x140f0a), panel: hex(0x1e1610), line: hex(0x35281c), text: hex(0xf3ece5), dim: hex(0xa89584), accent: hex(0xff8a3d), ink: hex(0x2a1102) },
+    Theme { key: "cherry", name: "Cherry Red", bg: hex(0x150b0d), panel: hex(0x201215), line: hex(0x3a2226), text: hex(0xf4e8ea), dim: hex(0xa88d92), accent: hex(0xff4d6a), ink: hex(0x2b0309) },
+    Theme { key: "gold", name: "Golden Yellow", bg: hex(0x13110a), panel: hex(0x1d1a10), line: hex(0x353020), text: hex(0xf2efe4), dim: hex(0xa39d86), accent: hex(0xf5c542), ink: hex(0x2a1f00) },
+];
+
+/// The chosen theme (an index into THEMES), read wherever the window paints.
+static THEME: AtomicUsize = AtomicUsize::new(0);
+
+fn t() -> &'static Theme {
+    &THEMES[THEME.load(Ordering::Relaxed)]
+}
+
+fn theme_index(key: Option<&str>) -> usize {
+    key.and_then(|k| THEMES.iter().position(|t| t.key == k)).unwrap_or(0)
+}
 
 fn visuals() -> egui::Visuals {
     let mut v = egui::Visuals::dark();
-    v.panel_fill = BG;
-    v.window_fill = PANEL;
-    v.faint_bg_color = PANEL;
-    v.extreme_bg_color = Color32::from_rgb(6, 12, 9);
-    v.window_stroke = egui::Stroke::new(1.0, LINE);
+    v.panel_fill = t().bg;
+    v.window_fill = t().panel;
+    v.faint_bg_color = t().panel;
+    let [r, g, b, _] = t().bg.to_array();
+    v.extreme_bg_color = Color32::from_rgb(r * 3 / 5, g * 3 / 5, b * 3 / 5);
+    v.window_stroke = egui::Stroke::new(1.0, t().line);
     v.window_corner_radius = egui::CornerRadius::same(16);
-    v.selection.bg_fill = FILL;
-    v.hyperlink_color = ACCENT;
-    v.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0, LINE);
-    v.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, TEXT);
+    v.selection.bg_fill = t().accent;
+    v.hyperlink_color = t().accent;
+    v.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0, t().line);
+    v.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, t().text);
     for w in [&mut v.widgets.inactive, &mut v.widgets.hovered, &mut v.widgets.active] {
         w.corner_radius = egui::CornerRadius::same(8);
     }
@@ -41,13 +75,13 @@ fn visuals() -> egui::Visuals {
 /// A rounded panel like the phone app's cards, with a small all-caps title.
 fn card<R>(ui: &mut egui::Ui, title: &str, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
     egui::Frame::new()
-        .fill(PANEL)
-        .stroke(egui::Stroke::new(1.0, LINE))
+        .fill(t().panel)
+        .stroke(egui::Stroke::new(1.0, t().line))
         .corner_radius(12)
         .inner_margin(12)
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
-            ui.label(RichText::new(title.to_uppercase()).small().color(DIM));
+            ui.label(RichText::new(title.to_uppercase()).small().color(t().dim));
             ui.add_space(6.0);
             add(ui)
         })
@@ -55,9 +89,50 @@ fn card<R>(ui: &mut egui::Ui, title: &str, add: impl FnOnce(&mut egui::Ui) -> R)
 }
 
 fn primary_button(text: &str) -> egui::Button<'static> {
-    egui::Button::new(RichText::new(text.to_string()).size(16.0).strong().color(INK))
-        .fill(FILL)
+    egui::Button::new(RichText::new(text.to_string()).size(16.0).strong().color(t().ink))
+        .fill(t().accent)
         .min_size(egui::vec2(120.0, 38.0))
+}
+
+/// The settings button: a gear drawn to fill the button, like the phone app's.
+fn gear_button(ui: &mut egui::Ui) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(40.0, 40.0), egui::Sense::click());
+    let th = t();
+    let fill = if resp.hovered() { th.line } else { th.panel };
+    let p = ui.painter();
+    p.rect(rect, 10, fill, egui::Stroke::new(1.0, th.line), egui::StrokeKind::Inside);
+    let c = rect.center();
+    for i in 0..8 {
+        let a = i as f32 * std::f32::consts::TAU / 8.0;
+        let (d, n) = (egui::vec2(a.cos(), a.sin()), egui::vec2(-a.sin(), a.cos()));
+        let tooth = vec![c + d * 6.5 + n * 2.6, c + d * 11.0 + n * 2.0, c + d * 11.0 - n * 2.0, c + d * 6.5 - n * 2.6];
+        p.add(egui::Shape::convex_polygon(tooth, th.text, egui::Stroke::NONE));
+    }
+    p.circle_filled(c, 8.0, th.text);
+    p.circle_filled(c, 3.4, fill);
+    resp.on_hover_text("Settings")
+}
+
+/// A theme choice drawn in that theme's own colors, so you can see it before picking it.
+fn theme_tile(ui: &mut egui::Ui, theme: &Theme, selected: bool) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(132.0, 70.0), egui::Sense::click());
+    let p = ui.painter();
+    let stroke = if selected {
+        egui::Stroke::new(2.0, theme.accent)
+    } else {
+        egui::Stroke::new(1.0, if resp.hovered() { theme.accent } else { theme.line })
+    };
+    p.rect(rect, 12, theme.bg, stroke, egui::StrokeKind::Inside);
+    let pill = egui::Rect::from_center_size(rect.center() - egui::vec2(0.0, 13.0), egui::vec2(44.0, 14.0));
+    p.rect_filled(pill, 7, theme.accent);
+    p.text(
+        rect.center() + egui::vec2(0.0, 14.0),
+        egui::Align2::CENTER_CENTER,
+        theme.name,
+        egui::FontId::proportional(14.0),
+        theme.accent,
+    );
+    resp.on_hover_text(theme.name)
 }
 
 /// "#57": the last part of this computer's address, matching the tag phones show.
@@ -82,6 +157,7 @@ pub fn run(name: String, cfg: Config, opts: SharedOpts, port: u16) -> Result<(),
         "ScanSend",
         native,
         Box::new(move |cc| {
+            THEME.store(theme_index(cfg.theme.as_deref()), Ordering::Relaxed);
             cc.egui_ctx.set_theme(egui::Theme::Dark);
             cc.egui_ctx.set_visuals_of(egui::Theme::Dark, visuals());
             let ctx = cc.egui_ctx.clone();
@@ -122,6 +198,7 @@ struct ReceiverApp {
     fw_result: Option<Result<(), String>>,
     start_at_login: bool,
     startup_err: Option<String>,
+    settings_open: bool,
 }
 
 impl ReceiverApp {
@@ -141,6 +218,7 @@ impl ReceiverApp {
             fw_result: None,
             start_at_login: crate::startup::is_enabled(),
             startup_err: None,
+            settings_open: false,
         };
         // First launch: ask once for admin rights to open the ports, so the
         // phone can get through without the user touching a terminal.
@@ -201,25 +279,29 @@ impl ReceiverApp {
     }
 
     /// The computer's name, details and status, across the top of the window.
-    fn header(&self, ui: &mut egui::Ui, status: &Status) {
+    fn header(&mut self, ui: &mut egui::Ui, status: &Status) {
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(&self.state.name).size(28.0).strong().color(TEXT));
-                    ui.label(RichText::new(short_tag(&self.ips)).size(20.0).color(DIM));
+                    ui.label(RichText::new(&self.state.name).size(28.0).strong().color(t().text));
+                    ui.label(RichText::new(short_tag(&self.ips)).size(20.0).color(t().dim));
                 });
                 let mut sub = vec![net::device_name(), scansend_proto::os_label().to_string()];
                 if let Some(ip) = self.ips.first() {
                     sub.push(ip.to_string());
                 }
                 sub.push(format!("v{}", env!("CARGO_PKG_VERSION")));
-                ui.label(RichText::new(sub.join("  ·  ")).size(12.5).color(DIM));
+                ui.label(RichText::new(sub.join("  ·  ")).size(12.5).color(t().dim));
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if gear_button(ui).clicked() {
+                    self.settings_open = true;
+                }
+                ui.add_space(4.0);
                 let (dot, text, hover) = match status {
-                    Status::Starting => (DIM, "Starting…", String::new()),
+                    Status::Starting => (t().dim, "Starting…", String::new()),
                     Status::Listening { discovery_ok: true } => {
-                        (ACCENT, "Ready", "Phones on this Wi-Fi can find this computer.".to_string())
+                        (t().accent, "Ready", "Phones on this Wi-Fi can find this computer.".to_string())
                     }
                     Status::Listening { discovery_ok: false } => (
                         Color32::YELLOW,
@@ -230,14 +312,14 @@ impl ReceiverApp {
                     Status::Failed(msg) => (Color32::LIGHT_RED, "Not receiving", msg.clone()),
                 };
                 let pill = egui::Frame::new()
-                    .fill(PANEL)
-                    .stroke(egui::Stroke::new(1.0, LINE))
+                    .fill(t().panel)
+                    .stroke(egui::Stroke::new(1.0, t().line))
                     .corner_radius(255)
                     .inner_margin(egui::Margin::symmetric(12, 6))
                     .show(ui, |ui| {
                         // Inside the right-to-left header, so the label goes first to put the dot on its left.
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new(text).color(TEXT));
+                            ui.label(RichText::new(text).color(t().text));
                             let (r, _) = ui.allocate_exact_size(egui::vec2(10.0, 10.0), egui::Sense::hover());
                             ui.painter().circle_filled(r.center(), 4.5, dot);
                         });
@@ -255,11 +337,11 @@ impl ReceiverApp {
                 ui.label("Open ScanSend on your phone and tap");
                 ui.add_space(2.0);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(format!("💻 {}", self.state.name)).size(18.0).strong().color(ACCENT));
-                    ui.label(RichText::new(short_tag(&self.ips)).size(15.0).color(DIM));
+                    ui.label(RichText::new(format!("💻 {}", self.state.name)).size(18.0).strong().color(t().accent));
+                    ui.label(RichText::new(short_tag(&self.ips)).size(15.0).color(t().dim));
                 });
                 ui.add_space(2.0);
-                ui.label(RichText::new("You'll be asked here to accept it.").color(DIM));
+                ui.label(RichText::new("You'll be asked here to accept it.").color(t().dim));
                 self.firewall_hint(ui);
             });
             return;
@@ -305,7 +387,7 @@ impl ReceiverApp {
         }
         ui.add_space(8.0);
         if let Some(Ok(())) = self.fw_result {
-            ui.label(RichText::new(format!("✓ {} allows ScanSend", fw.name())).color(ACCENT));
+            ui.label(RichText::new(format!("✓ {} allows ScanSend", fw.name())).color(t().accent));
             ui.label(RichText::new("Phone still can't connect? Make sure it's on the same Wi-Fi, not mobile data.").weak().small());
             return;
         }
@@ -346,17 +428,17 @@ impl ReceiverApp {
         egui::Modal::new(egui::Id::new(("ask", &a.request_id)))
             .frame(
                 egui::Frame::new()
-                    .fill(PANEL)
-                    .stroke(egui::Stroke::new(2.0, FILL))
+                    .fill(t().panel)
+                    .stroke(egui::Stroke::new(2.0, t().accent))
                     .corner_radius(16)
                     .inner_margin(22),
             )
             .show(ctx, |ui| {
                 ui.set_width(320.0);
-                ui.label(RichText::new("WANTS TO CONNECT").small().color(DIM));
+                ui.label(RichText::new("WANTS TO CONNECT").small().color(t().dim));
                 ui.add_space(6.0);
-                ui.label(RichText::new(format!("📱 {}", a.device_name)).size(24.0).strong().color(ACCENT));
-                ui.label(RichText::new(format!("from {}", a.from)).color(DIM));
+                ui.label(RichText::new(format!("📱 {}", a.device_name)).size(24.0).strong().color(t().accent));
+                ui.label(RichText::new(format!("from {}", a.from)).color(t().dim));
                 ui.add_space(8.0);
                 ui.label("Accept to let this phone send scans to this computer.");
                 ui.add_space(14.0);
@@ -371,10 +453,67 @@ impl ReceiverApp {
             });
     }
 
-    fn settings_panel(&mut self, ui: &mut egui::Ui) {
-        card(ui, "When a scan arrives", |ui| self.scan_options(ui));
-        ui.add_space(10.0);
-        card(ui, "This computer", |ui| {
+    /// Settings, like the phone app's: what happens to a scan, this computer, themes.
+    fn settings_window(&mut self, ctx: &egui::Context) {
+        if !self.settings_open {
+            return;
+        }
+        let th = *t();
+        let mut done = false;
+        let modal = egui::Modal::new(egui::Id::new("settings"))
+            .frame(
+                egui::Frame::new()
+                    .fill(th.panel)
+                    .stroke(egui::Stroke::new(1.0, th.line))
+                    .corner_radius(16)
+                    .inner_margin(22),
+            )
+            .show(ctx, |ui| {
+                ui.set_width(430.0);
+                ui.label(RichText::new("Settings").size(22.0).strong().color(th.text));
+                let section = |ui: &mut egui::Ui, title: &str| {
+                    ui.add_space(14.0);
+                    ui.label(RichText::new(title).small().color(th.dim));
+                    ui.add_space(4.0);
+                };
+                section(ui, "WHEN A SCAN ARRIVES");
+                self.scan_options(ui);
+                section(ui, "THIS COMPUTER");
+                self.startup_option(ui);
+                section(ui, "THEMES");
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = egui::vec2(10.0, 10.0);
+                    let current = THEME.load(Ordering::Relaxed);
+                    for (i, theme) in THEMES.iter().enumerate() {
+                        if theme_tile(ui, theme, i == current).clicked() {
+                            self.set_theme(ui.ctx(), i);
+                        }
+                    }
+                });
+                ui.add_space(16.0);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.add(primary_button("Done")).clicked() {
+                        done = true;
+                    }
+                });
+            });
+        if done || modal.should_close() {
+            self.settings_open = false;
+        }
+    }
+
+    fn set_theme(&mut self, ctx: &egui::Context, i: usize) {
+        THEME.store(i, Ordering::Relaxed);
+        ctx.set_visuals_of(egui::Theme::Dark, visuals());
+        let mut cfg = self.state.cfg.lock().unwrap();
+        cfg.theme = Some(THEMES[i].key.to_string());
+        if let Err(e) = cfg.save() {
+            eprintln!("could not save settings: {e:#}");
+        }
+    }
+
+    fn startup_option(&mut self, ui: &mut egui::Ui) {
+        {
             let mut on = self.start_at_login;
             if ui.checkbox(&mut on, "Start ScanSend when I log in").changed() {
                 match crate::startup::set(on) {
@@ -388,7 +527,7 @@ impl ReceiverApp {
             if let Some(e) = &self.startup_err {
                 ui.label(RichText::new(e).color(Color32::LIGHT_RED).small());
             }
-        });
+        }
     }
 
     fn scan_options(&mut self, ui: &mut egui::Ui) {
@@ -418,7 +557,7 @@ impl ReceiverApp {
         let devices = self.state.cfg.lock().unwrap().devices.clone();
         card(ui, "Phones", |ui| {
             if devices.is_empty() {
-                ui.label(RichText::new("None yet").color(DIM));
+                ui.label(RichText::new("None yet").color(t().dim));
             }
             for d in devices {
                 ui.horizontal(|ui| {
@@ -438,7 +577,7 @@ impl ReceiverApp {
     fn scans_panel(&mut self, ui: &mut egui::Ui) {
         let log: Vec<_> = self.state.log.lock().unwrap().iter().cloned().collect();
         ui.horizontal(|ui| {
-            ui.label(RichText::new("RECENT SCANS").small().color(DIM));
+            ui.label(RichText::new("RECENT SCANS").small().color(t().dim));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if !log.is_empty() && ui.button("Clear").clicked() {
                     self.state.log.lock().unwrap().clear();
@@ -458,16 +597,16 @@ impl ReceiverApp {
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             for (i, ev) in log.iter().enumerate() {
                 egui::Frame::new()
-                    .fill(PANEL)
-                    .stroke(egui::Stroke::new(1.0, LINE))
+                    .fill(t().panel)
+                    .stroke(egui::Stroke::new(1.0, t().line))
                     .corner_radius(10)
                     .inner_margin(10)
                     .show(ui, |ui| {
                     ui.set_width(ui.available_width());
                     ui.horizontal(|ui| {
                         ui.label(RichText::new(&ev.time).monospace().weak());
-                        ui.label(RichText::new(&ev.format).small().color(ACCENT));
-                        ui.label(RichText::new(format!("📱 {}", ev.device)).small().color(DIM));
+                        ui.label(RichText::new(&ev.format).small().color(t().accent));
+                        ui.label(RichText::new(format!("📱 {}", ev.device)).small().color(t().dim));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             let label = if copied.map(|(c, _)| c) == Some(i) { "Copied ✓" } else { "Copy" };
                             if ui.small_button(label).clicked() {
@@ -499,13 +638,13 @@ impl eframe::App for ReceiverApp {
 
         let status = self.state.status.lock().unwrap().clone();
         egui::Panel::top("header")
-            .frame(egui::Frame::new().fill(BG).inner_margin(egui::Margin { left: 18, right: 18, top: 16, bottom: 12 }))
+            .frame(egui::Frame::new().fill(t().bg).inner_margin(egui::Margin { left: 18, right: 18, top: 16, bottom: 12 }))
             .show(ui, |ui| self.header(ui, &status));
 
         egui::Panel::left("left")
             .resizable(false)
             .exact_size(310.0)
-            .frame(egui::Frame::new().fill(BG).inner_margin(egui::Margin { left: 18, right: 8, top: 4, bottom: 12 }))
+            .frame(egui::Frame::new().fill(t().bg).inner_margin(egui::Margin { left: 18, right: 8, top: 4, bottom: 12 }))
             .show(ui, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     if let Status::Failed(msg) = &status {
@@ -517,14 +656,13 @@ impl eframe::App for ReceiverApp {
                     }
                     ui.add_space(10.0);
                     self.devices_panel(ui);
-                    ui.add_space(10.0);
-                    self.settings_panel(ui);
                 });
             });
 
         egui::CentralPanel::default()
-            .frame(egui::Frame::new().fill(BG).inner_margin(egui::Margin { left: 10, right: 18, top: 4, bottom: 12 }))
+            .frame(egui::Frame::new().fill(t().bg).inner_margin(egui::Margin { left: 10, right: 18, top: 4, bottom: 12 }))
             .show(ui, |ui| self.scans_panel(ui));
+        self.settings_window(&ctx);
         self.ask_window(&ctx);
     }
 }

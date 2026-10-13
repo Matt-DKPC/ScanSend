@@ -38,7 +38,7 @@
   computer until you tap Send.
 - **Works where you work.** Android and iPhone phones; Windows, Linux and Mac computers.
 - **Small and to the point.** Scan, check, send. Recent scans with Copy, on both sides.
-- **Make it yours.** Themes like Forest Green, Wayland Blue, Grape Purple and Ember Orange.
+- **Make it yours.** Themes like Forest Green, Wayland Blue, Grape Purple and Ember Orange, on the phone and the computer.
 
 <p align="center">
   <img src="docs/images/computer.png" alt="The computer window with recent scans and settings" width="720">
@@ -62,10 +62,18 @@ for ScanSend (local network only); on Linux, the window offers to open them for 
 
 ## Settings on the computer
 
+The ⚙ button opens Settings:
+
 - **When a scan arrives:** type it into the active window, then press Enter, Tab or nothing;
   copy it to the clipboard; or both.
 - **Start ScanSend when I log in.**
-- **Phones:** every connected phone, with **Unpair**.
+- **Themes:** the same seven as the phone app.
+
+Every connected phone is listed on the main window, with **Unpair**.
+
+<p align="center">
+  <img src="docs/images/computer-settings.png" alt="The computer's Settings window with the theme picker" width="640">
+</p>
 
 Running without a window: `scansend --terminal` (new phones are accepted by typing `y`).
 Other options: `--suffix enter|tab|none`, `--no-type`, `--no-clipboard`, `--name "Front Desk"`,
