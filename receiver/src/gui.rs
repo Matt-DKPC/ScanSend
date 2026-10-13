@@ -135,6 +135,78 @@ fn theme_tile(ui: &mut egui::Ui, theme: &Theme, selected: bool) -> egui::Respons
     resp.on_hover_text(theme.name)
 }
 
+/// Use the computer's own UI font (Segoe UI on Windows, like the phone app uses its system
+/// font), with a bold face for headings. Falls back to egui's font if none is found.
+fn install_fonts(ctx: &egui::Context) {
+    const PAIRS: &[(&str, &str)] = &[
+        ("C:\\Windows\\Fonts\\segoeui.ttf", "C:\\Windows\\Fonts\\segoeuib.ttf"),
+        ("/System/Library/Fonts/Supplemental/Arial.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf"),
+        ("/usr/share/fonts/noto/NotoSans-Regular.ttf", "/usr/share/fonts/noto/NotoSans-Bold.ttf"),
+        ("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf"),
+        ("/usr/share/fonts/google-noto/NotoSans-Regular.ttf", "/usr/share/fonts/google-noto/NotoSans-Bold.ttf"),
+        ("/usr/share/fonts/TTF/DejaVuSans.ttf", "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"),
+        ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+    ];
+    let mut fonts = egui::FontDefinitions::default();
+    let found = PAIRS.iter().find_map(|(r, b)| Some((std::fs::read(r).ok()?, std::fs::read(b).ok()?)));
+    let have_ui_font = found.is_some();
+    if let Some((regular, bold)) = found {
+        fonts.font_data.insert("ui".into(), Arc::new(egui::FontData::from_owned(regular)));
+        fonts.font_data.insert("ui-bold".into(), Arc::new(egui::FontData::from_owned(bold)));
+        fonts.families.entry(egui::FontFamily::Proportional).or_default().insert(0, "ui".into());
+    }
+    let mut bold = fonts.families.get(&egui::FontFamily::Proportional).cloned().unwrap_or_default();
+    if have_ui_font {
+        bold.insert(0, "ui-bold".into());
+    }
+    fonts.families.insert(egui::FontFamily::Name("bold".into()), bold);
+    ctx.set_fonts(fonts);
+}
+
+/// Bold text in the UI font (egui's .strong() only brightens the color).
+fn bold(text: impl Into<String>, size: f32) -> RichText {
+    RichText::new(text).family(egui::FontFamily::Name("bold".into())).size(size)
+}
+
+/// An all-caps section label, like the phone app's "NEARBY COMPUTERS".
+fn section_label(ui: &mut egui::Ui, text: &str) {
+    ui.label(RichText::new(text.to_uppercase()).size(12.5).color(t().dim).extra_letter_spacing(0.8));
+}
+
+/// The rounded, accent-tinted icon box the phone uses on its cards, with a phone inside.
+fn phone_icon(ui: &mut egui::Ui) {
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(36.0, 36.0), egui::Sense::hover());
+    let th = t();
+    let p = ui.painter();
+    p.rect_filled(rect, 10, th.accent.gamma_multiply(0.16));
+    let body = egui::Rect::from_center_size(rect.center(), egui::vec2(13.0, 21.0));
+    p.rect_stroke(body, 3, egui::Stroke::new(1.8, th.text), egui::StrokeKind::Middle);
+    let y = rect.center().y;
+    p.line_segment([egui::pos2(body.left() + 3.0, y), egui::pos2(body.right() - 3.0, y)], egui::Stroke::new(2.2, th.accent));
+}
+
+/// The phone app's "sent" check mark, drawn so it looks the same in every font.
+fn check_mark(ui: &mut egui::Ui) {
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(18.0, 18.0), egui::Sense::hover());
+    let c = rect.center();
+    let pts = [c + egui::vec2(-6.0, 0.5), c + egui::vec2(-2.0, 4.5), c + egui::vec2(6.0, -4.5)];
+    ui.painter().add(egui::Shape::line(pts.to_vec(), egui::Stroke::new(2.4, t().accent)));
+}
+
+/// A card like the phone app's: rounded, filled, thin border.
+fn row_card<R>(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
+    egui::Frame::new()
+        .fill(t().panel)
+        .stroke(egui::Stroke::new(1.0, t().line))
+        .corner_radius(12)
+        .inner_margin(egui::Margin::symmetric(12, 10))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            add(ui)
+        })
+        .inner
+}
+
 /// "#57": the last part of this computer's address, matching the tag phones show.
 fn short_tag(ips: &[IpAddr]) -> String {
     match ips.first() {
@@ -158,6 +230,7 @@ pub fn run(name: String, cfg: Config, opts: SharedOpts, port: u16) -> Result<(),
         native,
         Box::new(move |cc| {
             THEME.store(theme_index(cfg.theme.as_deref()), Ordering::Relaxed);
+            install_fonts(&cc.egui_ctx);
             cc.egui_ctx.set_theme(egui::Theme::Dark);
             cc.egui_ctx.set_visuals_of(egui::Theme::Dark, visuals());
             let ctx = cc.egui_ctx.clone();
@@ -278,21 +351,12 @@ impl ReceiverApp {
         }
     }
 
-    /// The computer's name, details and status, across the top of the window.
-    fn header(&mut self, ui: &mut egui::Ui, status: &Status) {
+    /// Like the phone app's header: the ScanSend wordmark, then status and the gear.
+    fn top_bar(&mut self, ui: &mut egui::Ui, status: &Status) {
         ui.horizontal(|ui| {
-            ui.vertical(|ui| {
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new(&self.state.name).size(28.0).strong().color(t().text));
-                    ui.label(RichText::new(short_tag(&self.ips)).size(20.0).color(t().dim));
-                });
-                let mut sub = vec![net::device_name(), scansend_proto::os_label().to_string()];
-                if let Some(ip) = self.ips.first() {
-                    sub.push(ip.to_string());
-                }
-                sub.push(format!("v{}", env!("CARGO_PKG_VERSION")));
-                ui.label(RichText::new(sub.join("  ·  ")).size(12.5).color(t().dim));
-            });
+            ui.label(bold("Scan", 22.0).color(t().text));
+            ui.add_space(-ui.spacing().item_spacing.x);
+            ui.label(bold("Send", 22.0).color(t().accent));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if gear_button(ui).clicked() {
                     self.settings_open = true;
@@ -317,7 +381,7 @@ impl ReceiverApp {
                     .corner_radius(255)
                     .inner_margin(egui::Margin::symmetric(12, 6))
                     .show(ui, |ui| {
-                        // Inside the right-to-left header, so the label goes first to put the dot on its left.
+                        // Inside the right-to-left bar, so the label goes first to put the dot on its left.
                         ui.horizontal(|ui| {
                             ui.label(RichText::new(text).color(t().text));
                             let (r, _) = ui.allocate_exact_size(egui::vec2(10.0, 10.0), egui::Sense::hover());
@@ -328,6 +392,42 @@ impl ReceiverApp {
                     pill.response.on_hover_text(hover);
                 }
             });
+        });
+    }
+
+    /// Like the phone app's "📱 Sleepy Dongle / This phone · IP": this computer's name, big and centered.
+    fn hero(&mut self, ui: &mut egui::Ui, status: &Status) {
+        ui.vertical_centered(|ui| {
+            ui.horizontal(|ui| {
+                // Center the name + tag as one line.
+                let name = bold(format!("💻 {}", self.state.name), 30.0).color(t().accent);
+                let tag = RichText::new(format!(" {}", short_tag(&self.ips))).size(20.0).color(t().dim);
+                let w = ui.fonts_mut(|f| {
+                    let a = f.layout_no_wrap(name.text().to_string(), egui::FontId::new(30.0, egui::FontFamily::Name("bold".into())), t().accent).size().x;
+                    let b = f.layout_no_wrap(tag.text().to_string(), egui::FontId::proportional(20.0), t().dim).size().x;
+                    a + b
+                });
+                ui.add_space(((ui.available_width() - w) / 2.0).max(0.0));
+                ui.label(name);
+                ui.add_space(-ui.spacing().item_spacing.x);
+                ui.label(tag);
+            });
+            let mut sub = vec!["This computer".to_string(), net::device_name(), scansend_proto::os_label().to_string()];
+            if let Some(ip) = self.ips.first() {
+                sub.push(ip.to_string());
+            }
+            sub.push(format!("v{}", env!("CARGO_PKG_VERSION")));
+            ui.label(RichText::new(sub.join(" · ")).size(13.0).color(t().dim));
+            ui.add_space(8.0);
+            if let Status::Failed(msg) = status {
+                ui.label(RichText::new(msg).color(Color32::LIGHT_RED));
+            } else if crate::SHOW_QR_PAIRING {
+                self.pairing_panel(ui);
+            } else {
+                ui.label(RichText::new("Open ScanSend on your phone and tap this computer to connect.").color(t().dim));
+                ui.set_max_width(460.0);
+                self.firewall_hint(ui);
+            }
         });
     }
 
@@ -437,7 +537,7 @@ impl ReceiverApp {
                 ui.set_width(320.0);
                 ui.label(RichText::new("WANTS TO CONNECT").small().color(t().dim));
                 ui.add_space(6.0);
-                ui.label(RichText::new(format!("📱 {}", a.device_name)).size(24.0).strong().color(t().accent));
+                ui.label(bold(format!("📱 {}", a.device_name), 24.0).color(t().accent));
                 ui.label(RichText::new(format!("from {}", a.from)).color(t().dim));
                 ui.add_space(8.0);
                 ui.label("Accept to let this phone send scans to this computer.");
@@ -470,7 +570,7 @@ impl ReceiverApp {
             )
             .show(ctx, |ui| {
                 ui.set_width(430.0);
-                ui.label(RichText::new("Settings").size(22.0).strong().color(th.text));
+                ui.label(bold("Settings", 22.0).color(th.text));
                 let section = |ui: &mut egui::Ui, title: &str| {
                     ui.add_space(14.0);
                     ui.label(RichText::new(title).small().color(th.dim));
@@ -553,71 +653,84 @@ impl ReceiverApp {
         }
     }
 
+    /// The phones that can send here, as cards like the phone app's computer list.
     fn devices_panel(&mut self, ui: &mut egui::Ui) {
         let devices = self.state.cfg.lock().unwrap().devices.clone();
-        card(ui, "Phones", |ui| {
-            if devices.is_empty() {
+        section_label(ui, "Your phones");
+        ui.add_space(4.0);
+        if devices.is_empty() {
+            row_card(ui, |ui| {
                 ui.label(RichText::new("None yet").color(t().dim));
-            }
-            for d in devices {
+                ui.label(RichText::new(format!("On your phone, tap 💻 {}", self.state.name)).size(13.0).color(t().dim));
+            });
+        }
+        for d in devices {
+            row_card(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(format!("📱 {}", d.name)).size(15.0));
+                    phone_icon(ui);
+                    ui.add_space(4.0);
+                    ui.vertical(|ui| {
+                        ui.label(RichText::new(&d.name).size(16.0).color(t().text));
+                        ui.label(RichText::new("Can send scans here").size(12.5).color(t().dim));
+                    });
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.small_button("Unpair").on_hover_text("This phone will need to connect again").clicked() {
+                        if ui.button("Unpair").on_hover_text("This phone will need to connect again").clicked() {
                             if let Err(e) = self.state.unpair(&d.token_sha256) {
                                 eprintln!("unpair failed: {e:#}");
                             }
                         }
                     });
                 });
-            }
-        });
+            });
+            ui.add_space(8.0);
+        }
     }
 
+    /// Recent scans, styled like the phone app's list: ✓, the code, a small line under it, Copy.
     fn scans_panel(&mut self, ui: &mut egui::Ui) {
         let log: Vec<_> = self.state.log.lock().unwrap().iter().cloned().collect();
         ui.horizontal(|ui| {
-            ui.label(RichText::new("RECENT SCANS").small().color(t().dim));
+            section_label(ui, "Recent scans");
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if !log.is_empty() && ui.button("Clear").clicked() {
                     self.state.log.lock().unwrap().clear();
                 }
             });
         });
-        ui.separator();
+        ui.add_space(4.0);
         if log.is_empty() {
-            ui.add_space(30.0);
-            ui.vertical_centered(|ui| {
-                ui.label(RichText::new("Nothing scanned yet").size(18.0).weak());
-                ui.label(RichText::new("Click into a text box in any app, then tap Scan on your phone.").weak());
+            row_card(ui, |ui| {
+                ui.add_space(14.0);
+                ui.vertical_centered(|ui| {
+                    ui.label(RichText::new("Nothing scanned yet").size(17.0).color(t().dim));
+                    ui.label(RichText::new("Click into a text box in any app, then scan with your phone.").color(t().dim));
+                });
+                ui.add_space(14.0);
             });
             return;
         }
         let copied = self.copied_at.filter(|(_, t)| t.elapsed() < Duration::from_millis(1200));
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             for (i, ev) in log.iter().enumerate() {
-                egui::Frame::new()
-                    .fill(t().panel)
-                    .stroke(egui::Stroke::new(1.0, t().line))
-                    .corner_radius(10)
-                    .inner_margin(10)
-                    .show(ui, |ui| {
-                    ui.set_width(ui.available_width());
+                row_card(ui, |ui| {
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new(&ev.time).monospace().weak());
-                        ui.label(RichText::new(&ev.format).small().color(t().accent));
-                        ui.label(RichText::new(format!("📱 {}", ev.device)).small().color(t().dim));
+                        check_mark(ui);
+                        ui.add_space(6.0);
+                        ui.vertical(|ui| {
+                            ui.set_max_width(ui.available_width() - 80.0);
+                            ui.add(egui::Label::new(RichText::new(&ev.text).size(16.0).color(t().text)).wrap().selectable(true));
+                            ui.label(RichText::new(format!("{} · {} · 📱 {}", ev.format, ev.time, ev.device)).size(12.5).color(t().dim));
+                        });
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             let label = if copied.map(|(c, _)| c) == Some(i) { "Copied ✓" } else { "Copy" };
-                            if ui.small_button(label).clicked() {
+                            if ui.button(label).clicked() {
                                 ui.ctx().copy_text(ev.text.clone());
                                 self.copied_at = Some((i, Instant::now()));
                             }
                         });
                     });
-                    ui.add(egui::Label::new(RichText::new(&ev.text).monospace().size(15.0)).wrap().selectable(true));
                 });
-                ui.add_space(6.0);
+                ui.add_space(8.0);
             }
         });
         if copied.is_some() {
@@ -637,31 +750,18 @@ impl eframe::App for ReceiverApp {
         ctx.request_repaint_after(Duration::from_secs(10));
 
         let status = self.state.status.lock().unwrap().clone();
-        egui::Panel::top("header")
-            .frame(egui::Frame::new().fill(t().bg).inner_margin(egui::Margin { left: 18, right: 18, top: 16, bottom: 12 }))
-            .show(ui, |ui| self.header(ui, &status));
-
-        egui::Panel::left("left")
+        let pad = |l, r, top, b| egui::Frame::new().fill(t().bg).inner_margin(egui::Margin { left: l, right: r, top, bottom: b });
+        egui::Panel::top("bar").show_separator_line(false).frame(pad(20, 20, 14, 4)).show(ui, |ui| self.top_bar(ui, &status));
+        egui::Panel::top("hero").show_separator_line(false).frame(pad(20, 20, 6, 16)).show(ui, |ui| self.hero(ui, &status));
+        egui::Panel::left("phones")
+            .show_separator_line(false)
             .resizable(false)
-            .exact_size(310.0)
-            .frame(egui::Frame::new().fill(t().bg).inner_margin(egui::Margin { left: 18, right: 8, top: 4, bottom: 12 }))
+            .exact_size(320.0)
+            .frame(pad(20, 10, 0, 16))
             .show(ui, |ui| {
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    if let Status::Failed(msg) = &status {
-                        card(ui, "Not receiving scans", |ui| {
-                            ui.label(RichText::new(msg).color(Color32::LIGHT_RED));
-                        });
-                    } else {
-                        self.pairing_panel(ui);
-                    }
-                    ui.add_space(10.0);
-                    self.devices_panel(ui);
-                });
+                egui::ScrollArea::vertical().show(ui, |ui| self.devices_panel(ui));
             });
-
-        egui::CentralPanel::default()
-            .frame(egui::Frame::new().fill(t().bg).inner_margin(egui::Margin { left: 10, right: 18, top: 4, bottom: 12 }))
-            .show(ui, |ui| self.scans_panel(ui));
+        egui::CentralPanel::default().frame(pad(10, 20, 0, 16)).show(ui, |ui| self.scans_panel(ui));
         self.settings_window(&ctx);
         self.ask_window(&ctx);
     }
