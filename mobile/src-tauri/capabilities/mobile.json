@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "mobile",
+  "description": "Camera barcode scanning on phones",
+  "windows": ["main"],
+  "platforms": ["android", "iOS"],
+  "permissions": ["barcode-scanner:default"]
+}

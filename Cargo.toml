@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+members = ["proto", "receiver"]
+# The phone app is its own Cargo workspace (mobile/src-tauri) so building the
+# receiver never needs the Tauri / Android toolchain.
+exclude = ["mobile"]
+
+[workspace.package]
+version = "0.3.9"
+edition = "2021"
+license = "MIT"

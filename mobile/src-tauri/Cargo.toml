@@ -1,0 +1,31 @@
+[package]
+name = "scansend-app"
+version = "0.3.9"
+edition = "2021"
+license = "MIT"
+description = "ScanSend phone app: scan barcodes/QR codes with the camera and send them to your computer"
+
+[lib]
+name = "scansend_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+scansend-proto = { path = "../../proto" }
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["net", "time", "macros", "rt"] }
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+rand = "0.9"
+hex = "0.4"
+
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+tauri-plugin-barcode-scanner = "2"
+
+[profile.release]
+lto = true
+opt-level = "s"
+strip = true
