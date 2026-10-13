@@ -175,6 +175,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/api/v1/scan", post(scan))
         .route("/api/v1/disconnect", post(disconnect))
         .route("/api/v1/rename", post(rename))
+        .route("/api/v1/paired", get(paired))
         .layer(DefaultBodyLimit::max(MAX_SCAN_LEN * 2))
         .with_state(state)
 }
@@ -348,6 +349,15 @@ fn set_device_name(s: &AppState, token: &str, name: &str) -> bool {
     drop(cfg);
     (s.on_change)();
     true
+}
+
+/// Phones ask this while on their main screen, so an Unpair here shows up there within seconds.
+async fn paired(State(s): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    if s.cfg.lock().unwrap().device_for_token(bearer(&headers)).is_some() {
+        StatusCode::NO_CONTENT.into_response()
+    } else {
+        err(StatusCode::UNAUTHORIZED, "not paired")
+    }
 }
 
 /// The phone changed its name in its settings.

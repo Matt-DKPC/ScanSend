@@ -853,6 +853,8 @@ async function refreshNearby() {
     refreshNearby.busy = true;
     $('nearbySpin').classList.add('on');
     try { nearby = await invoke('discover'); } catch { nearby = []; }
+    // A computer may have unpaired this phone; the discover call already dropped it.
+    try { state = await invoke('get_state'); render(); } catch {}
     refreshNearby.busy = false;
     $('nearbySpin').classList.remove('on');
     renderNearby();

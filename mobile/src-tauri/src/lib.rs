@@ -427,9 +427,47 @@ fn forget(id: String, state: State<'_, AppState>) -> Result<PublicState, String>
     Ok(state.public())
 }
 
+/// Ask each paired computer that's nearby whether it still knows this phone, and forget
+/// the ones that were unpaired on the computer. (Computers can't reach the phone, so
+/// the phone asks; older computers without /paired answer 404 and are left alone.)
+async fn drop_unpaired(found: &[Found], state: &AppState) {
+    let paired: Vec<Receiver> = {
+        let s = state.saved.lock().unwrap();
+        s.receivers.iter().filter(|r| found.iter().any(|f| f.id == r.id)).cloned().collect()
+    };
+    let mut set = tokio::task::JoinSet::new();
+    for r in paired {
+        let host = found.iter().find(|f| f.id == r.id).map(|f| (f.host.clone(), f.port)).unwrap_or((r.host.clone(), r.port));
+        set.spawn(async move {
+            let resp = http()
+                .get(format!("http://{}:{}/api/v1/paired", host.0, host.1))
+                .bearer_auth(&r.token)
+                .send()
+                .await;
+            (r.id, matches!(resp, Ok(ref x) if x.status() == reqwest::StatusCode::UNAUTHORIZED))
+        });
+    }
+    let mut gone = Vec::new();
+    while let Some(Ok((id, unpaired))) = set.join_next().await {
+        if unpaired {
+            gone.push(id);
+        }
+    }
+    if gone.is_empty() {
+        return;
+    }
+    let mut s = state.saved.lock().unwrap();
+    s.receivers.retain(|r| !gone.contains(&r.id));
+    if s.active.as_ref().is_some_and(|a| gone.contains(a)) {
+        s.active = s.receivers.first().map(|r| r.id.clone());
+    }
+    let _ = state.save(&s);
+}
+
 #[tauri::command]
 async fn discover(state: State<'_, AppState>) -> Result<Vec<Found>, String> {
     let mut found = find_computers(Duration::from_millis(1500)).await;
+    drop_unpaired(&found, &state).await;
     let mut s = state.saved.lock().unwrap();
     let mut changed = false;
     for f in &mut found {

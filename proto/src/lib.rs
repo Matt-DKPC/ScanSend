@@ -21,6 +21,7 @@
 //!   POST /api/v1/scan  Scan  (Bearer token)   -> 204
 //!   POST /api/v1/disconnect  (Bearer token)   -> 204  (phone tapped Forget)
 //!   POST /api/v1/rename  RenameRequest (Bearer token) -> 204  (phone changed its name)
+//!   GET  /api/v1/paired  (Bearer token)       -> 204, or 401 if this computer unpaired the phone
 //!   GET  /api/v1/info                         -> Info
 //!
 //! Older PIN pairing (hidden in the apps for now, kept in case it's needed):
