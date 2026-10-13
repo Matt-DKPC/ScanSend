@@ -825,11 +825,20 @@ $('findBtn').onclick = async () => {
   } catch (e) { list.innerHTML = ''; toast(errText(e), true); }
 };
 
-$('deviceName').onchange = async () => {
-  try { state = await invoke('set_device_name', { name: $('deviceName').value }); }
+// Save a typed name shortly after typing stops, and on Enter / Done / closing Settings.
+// (iPhone doesn't fire "change" when the dialog closes with the box still focused, so the
+// computer never heard about the new name.)
+async function saveName() {
+  clearTimeout(saveName.h);
+  const name = $('deviceName').value.trim();
+  if (!name || name === state.device_name) return;
+  try { state = await invoke('set_device_name', { name }); render(); }
   catch (e) { toast(errText(e), true); }
-  $('deviceName').blur(); render();
-};
+}
+$('deviceName').oninput = () => { clearTimeout(saveName.h); saveName.h = setTimeout(saveName, 800); };
+$('deviceName').onchange = saveName;
+$('deviceName').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); $('deviceName').blur(); saveName(); } };
+$('settings').addEventListener('close', saveName);
 $('rollName').onclick = async () => {
   try { state = await invoke('randomize_device_name'); render(); }
   catch (e) { toast(errText(e), true); }
