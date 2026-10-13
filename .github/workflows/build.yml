@@ -63,12 +63,35 @@ jobs:
           sed -i -E 's/targetSdk = [0-9]+/targetSdk = 36/' "$f"
           grep -n "targetSdk" "$f"
           grep -q "targetSdk = 36" "$f"
-      # Debug-signed so it sideloads directly onto any modern (arm64) Android phone.
-      - run: npx tauri android build --debug --apk --target aarch64 --ci
+      # A release APK signed with ScanSend's permanent key (repository secrets), so each
+      # new version installs over the old one. Phones only accept an update signed with
+      # the same key. Forks don't have the key and get a debug APK instead.
+      - name: Build and sign the APK
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          mkdir -p ../apk-out
+          apks=src-tauri/gen/android/app/build/outputs/apk
+          if [ -z "$KS_B64" ]; then
+            npx tauri android build --debug --apk --target aarch64 --ci
+            cp "$(find $apks -name '*debug*.apk' | head -1)" ../apk-out/scansend.apk
+            exit 0
+          fi
+          npx tauri android build --apk --target aarch64 --ci
+          in=$(find $apks -name '*release*.apk' | head -1)
+          bt="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          "$bt/zipalign" -p -f 4 "$in" "$RUNNER_TEMP/aligned.apk"
+          "$bt/apksigner" sign --ks "$RUNNER_TEMP/release.jks" --ks-type PKCS12 --ks-key-alias "$KS_ALIAS" \
+            --ks-pass env:KS_PASS --key-pass env:KS_PASS --out ../apk-out/scansend.apk "$RUNNER_TEMP/aligned.apk"
+          rm -f "$RUNNER_TEMP/release.jks"
+          "$bt/apksigner" verify --print-certs ../apk-out/scansend.apk | grep -i "SHA-256"
       - uses: actions/upload-artifact@v4
         with:
           name: scansend-android-apk
-          path: mobile/src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          path: apk-out/scansend.apk
 
   # Each new version (the one in Cargo.toml) gets a GitHub Release with the three apps,
   # so they can be downloaded from the Releases page without signing in.
@@ -97,7 +120,7 @@ jobs:
           cp artifacts/scansend-linux-x64/scansend-linux-x64 "out/ScanSend-$v-linux-x64"
           cp "$(find artifacts/scansend-android-apk -name '*.apk' | head -1)" "out/ScanSend-$v-android.apk"
           cat > notes.md <<NOTES
-          **Phone (Android):** download \`ScanSend-$v-android.apk\` on the phone and open it. If an older ScanSend is installed, uninstall it first.
+          **Phone (Android):** download \`ScanSend-$v-android.apk\` on the phone and open it. It installs over ScanSend 0.4.0 or newer; if you have 0.3.x, uninstall that once first.
 
           **Computer:** run \`ScanSend-$v-windows-x64.exe\` on Windows. On Linux, make it runnable first: \`chmod +x ScanSend-$v-linux-x64\`.
 

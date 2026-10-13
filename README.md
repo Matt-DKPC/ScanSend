@@ -50,7 +50,7 @@ Get the latest from the **[Releases page](../../releases/latest)**:
 
 | Device | File | Notes |
 |---|---|---|
-| Android phone | `ScanSend-…-android.apk` | Open it on the phone to install. Uninstall an older ScanSend first. |
+| Android phone | `ScanSend-…-android.apk` | Open it on the phone to install. Updates install over 0.4.0 and newer; uninstall a 0.3.x version once first. |
 | Windows computer | `ScanSend-…-windows-x64.exe` | Just run it. Allow it on **Private networks** when Windows asks. |
 | Linux computer | `ScanSend-…-linux-x64` | `chmod +x` it, then run it. |
 | iPhone | — | Not on the App Store yet; build it on a Mac (below). |

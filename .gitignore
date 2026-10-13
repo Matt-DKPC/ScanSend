@@ -2,3 +2,8 @@ target/
 mobile/node_modules/
 mobile/src-tauri/target/
 mobile/src-tauri/gen/
+
+# Signing keys never go in the repository.
+*.jks
+*.keystore
+keystore.properties
