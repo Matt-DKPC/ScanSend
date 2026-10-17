@@ -86,6 +86,9 @@
   .list button .grow { flex: 1; }
   .list small { color: var(--dim); }
   #findBtn { width: 100%; margin-bottom: 10px; }
+  #addBtn { width: 100%; margin: 0 0 14px; font-size: 15px; }
+  #addrInput { width: 100%; }
+  #addErr { color: var(--bad); font-size: 14px; white-space: pre-line; margin: 8px 0 0; }
   #nearbyList button { font-size: 18px; padding: 14px; }
   #nearbyList small { font-size: 13px; }
   /* Computer cards: ScanSend's own monitor glyph, a short #tag and a system badge. */
@@ -218,6 +221,7 @@
     <p class="label">Nearby computers <span class="sweep" id="nearbySpin" aria-label="Searching"><span class="bars"><svg viewBox="0 0 60 13" preserveAspectRatio="none" aria-hidden="true"><g fill="currentColor"><rect x="0" width="2" height="13"/><rect x="4" width="3" height="13"/><rect x="8" width="1" height="13"/><rect x="10" width="2" height="13"/><rect x="13" width="1" height="13"/><rect x="15" width="1" height="13"/><rect x="19" width="3" height="13"/><rect x="23" width="1" height="13"/><rect x="25" width="3" height="13"/><rect x="29" width="1" height="13"/><rect x="32" width="1" height="13"/><rect x="36" width="1" height="13"/><rect x="39" width="1" height="13"/><rect x="42" width="2" height="13"/><rect x="47" width="1" height="13"/><rect x="49" width="2" height="13"/><rect x="53" width="1" height="13"/><rect x="56" width="2" height="13"/></g></svg><i></i></span></span></p>
     <div class="list" id="nearbyList"></div>
     <p class="muted" id="nearbyEmpty">Looking for computers on this Wi-Fi…</p>
+    <button id="addBtn">Computer not listed? Add by address</button>
 
     <p class="label">Your computers</p>
     <div class="list" id="pairedList"></div>
@@ -306,6 +310,17 @@
   <div class="actions">
     <button id="forgetNo">Cancel</button>
     <button class="primary" id="forgetYes">Forget</button>
+  </div>
+</dialog>
+
+<dialog id="addDialog">
+  <h2>Add by address</h2>
+  <p class="muted">On the computer, ScanSend shows its address under its name, like <b>192.168.1.57</b>. Type it here, or just its last number.</p>
+  <input id="addrInput" type="text" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="192.168.1.57" aria-label="Computer's address">
+  <p id="addErr" role="alert" hidden></p>
+  <div class="actions">
+    <button id="addCancel">Cancel</button>
+    <button class="primary" id="addOk">Add</button>
   </div>
 </dialog>
 
@@ -890,6 +905,27 @@ function renderNearby() {
     list.appendChild(b);
   }
 }
+
+// Add by address: for a computer the search can't see (another subnet, multicast blocked...).
+$('addBtn').onclick = () => {
+  const d = $('addDialog');
+  $('addrInput').value = ''; $('addErr').hidden = true;
+  d.showModal(); setTimeout(() => $('addrInput').focus(), 50);
+};
+$('addCancel').onclick = () => $('addDialog').close();
+$('addrInput').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); $('addOk').click(); } };
+$('addOk').onclick = async () => {
+  const address = $('addrInput').value.trim();
+  if (!address || $('addOk').disabled) return;
+  $('addOk').disabled = true; $('addOk').textContent = 'Checking…';
+  try {
+    const f = await invoke('probe_address', { address });
+    $('addDialog').close();
+    if (f.paired) toast(f.name + ' is already connected ✓');
+    else connectTo(f);
+  } catch (e) { $('addErr').textContent = errText(e); $('addErr').hidden = false; }
+  finally { $('addOk').disabled = false; $('addOk').textContent = 'Add'; }
+};
 
 function randomId() {
   const b = new Uint8Array(12); crypto.getRandomValues(b);

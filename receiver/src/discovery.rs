@@ -1,7 +1,7 @@
 //! Answers "who's out there?" queries from phones on the LAN.
 
 use anyhow::Result;
-use scansend_proto::{Discovery, DISCOVERY_PORT, MULTICAST_ADDR, PROTOCOL_VERSION};
+use scansend_proto::{Discovery, DISCOVERY_PORT, MULTICAST_GROUPS, PROTOCOL_VERSION};
 use socket2::{Domain, Protocol, Socket, Type};
 use std::net::{Ipv4Addr, SocketAddr};
 use tokio::net::UdpSocket;
@@ -14,20 +14,22 @@ fn bind() -> Result<UdpSocket> {
     s.set_broadcast(true)?;
     s.bind(&SocketAddr::from((Ipv4Addr::UNSPECIFIED, DISCOVERY_PORT)).into())?;
 
-    // Join the group on every IPv4 interface so a PC with Wi-Fi + Ethernet
+    // Join the groups on every IPv4 interface so a PC with Wi-Fi + Ethernet
     // (or a VPN adapter grabbing the default route) still hears phones.
-    let mut joined = 0;
-    if let Ok(ifs) = local_ip_address::list_afinet_netifas() {
-        for (_, ip) in ifs {
-            if let std::net::IpAddr::V4(v4) = ip {
-                if !v4.is_loopback() && s.join_multicast_v4(&MULTICAST_ADDR, &v4).is_ok() {
-                    joined += 1;
-                }
-            }
+    let ifs: Vec<Ipv4Addr> = local_ip_address::list_afinet_netifas()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|(_, ip)| match ip {
+            std::net::IpAddr::V4(v4) if !v4.is_loopback() => Some(v4),
+            _ => None,
+        })
+        .collect();
+    for group in MULTICAST_GROUPS {
+        let joined = ifs.iter().filter(|v4| s.join_multicast_v4(&group, v4).is_ok()).count();
+        if joined == 0 {
+            // Broadcast still reaches this PC if no group can be joined at all.
+            let _ = s.join_multicast_v4(&group, &Ipv4Addr::UNSPECIFIED);
         }
-    }
-    if joined == 0 {
-        s.join_multicast_v4(&MULTICAST_ADDR, &Ipv4Addr::UNSPECIFIED)?;
     }
     s.set_nonblocking(true)?;
     Ok(UdpSocket::from_std(s.into())?)

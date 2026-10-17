@@ -16,7 +16,9 @@ async fn main() -> anyhow::Result<()> {
     let sock = tokio::net::UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).await?;
     sock.set_broadcast(true)?;
     let q = Discovery::query().to_bytes();
-    sock.send_to(&q, (MULTICAST_ADDR, DISCOVERY_PORT)).await?;
+    for group in MULTICAST_GROUPS {
+        sock.send_to(&q, (group, DISCOVERY_PORT)).await?;
+    }
     let _ = sock.send_to(&q, (Ipv4Addr::BROADCAST, DISCOVERY_PORT)).await;
     let _ = sock.send_to(&q, (Ipv4Addr::LOCALHOST, DISCOVERY_PORT)).await;
     let mut buf = [0u8; 1024];

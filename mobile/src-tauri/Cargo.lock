@@ -2592,7 +2592,7 @@ dependencies = [
 
 [[package]]
 name = "scansend-app"
-version = "0.4.7"
+version = "0.4.8"
 dependencies = [
  "hex",
  "rand",
@@ -2608,7 +2608,7 @@ dependencies = [
 
 [[package]]
 name = "scansend-proto"
-version = "0.4.7"
+version = "0.4.8"
 dependencies = [
  "serde",
  "serde_json",

@@ -321,7 +321,9 @@ async fn discover_inner(wait: Duration) -> Result<Vec<Found>, String> {
     let mut next_send = tokio::time::Instant::now();
     while tokio::time::Instant::now() < deadline {
         if tokio::time::Instant::now() >= next_send {
-            let _ = sock.send_to(&q, (MULTICAST_ADDR, DISCOVERY_PORT)).await;
+            for group in MULTICAST_GROUPS {
+                let _ = sock.send_to(&q, (group, DISCOVERY_PORT)).await;
+            }
             let _ = sock.send_to(&q, (Ipv4Addr::BROADCAST, DISCOVERY_PORT)).await;
             next_send += Duration::from_millis(400);
         }
@@ -485,6 +487,46 @@ async fn discover(state: State<'_, AppState>) -> Result<Vec<Found>, String> {
         let _ = state.save(&s);
     }
     Ok(found)
+}
+
+/// What was typed under "Add by address": "192.168.1.57", "192.168.1.57:53319",
+/// or just "57" / "#57" (the tag the computer shows) for an address on the phone's own /24.
+fn parse_address(typed: &str, phone_ip: Option<&str>) -> Result<(String, u16), String> {
+    let bad = || format!("\"{typed}\" isn't an address. Type it like 192.168.1.57, as the computer shows it.");
+    let t = typed.trim().trim_start_matches('#');
+    let (host, port) = match t.rsplit_once(':') {
+        Some((h, p)) => (h, p.parse::<u16>().map_err(|_| bad())?),
+        None => (t, DEFAULT_HTTP_PORT),
+    };
+    if let Ok(last) = host.parse::<u8>() {
+        let Some(Ok(IpAddr::V4(me))) = phone_ip.map(str::parse::<IpAddr>) else {
+            return Err("The phone isn't on Wi-Fi, so type the whole address (like 192.168.1.57).".into());
+        };
+        let [a, b, c, _] = me.octets();
+        return Ok((Ipv4Addr::new(a, b, c, last).to_string(), port));
+    }
+    match host.parse::<IpAddr>() {
+        Ok(IpAddr::V4(ip)) => Ok((ip.to_string(), port)),
+        _ => Err(bad()),
+    }
+}
+
+/// "Add by address", for a computer the Wi-Fi search can't see (LocalSend's
+/// manual sending): ask that one address directly.
+#[tauri::command]
+async fn probe_address(address: String, state: State<'_, AppState>) -> Result<Found, String> {
+    let (host, port) = parse_address(&address, local_ip(None).as_deref())?;
+    let (host, _) = reach_patiently(&[host], port).await?;
+    let info: Info = http()
+        .get(format!("http://{host}:{port}/api/v1/info"))
+        .send()
+        .await
+        .map_err(|e| format!("Can't reach {host}:{port} ({}).", why(&e)))?
+        .json()
+        .await
+        .map_err(|_| format!("{host}:{port} answered, but it isn't ScanSend."))?;
+    let paired = state.saved.lock().unwrap().receivers.iter().any(|r| r.id == info.id);
+    Ok(Found { id: info.id, name: info.name, host, port, paired, device: info.device, os: info.os })
 }
 
 /// Pair with a computer reachable at any of `hosts` (best first).
@@ -756,7 +798,8 @@ pub fn run() {
             send_scan,
             request_local_network,
             request_connect,
-            cancel_connect
+            cancel_connect,
+            probe_address
         ])
         .run(tauri::generate_context!())
         .expect("error while running ScanSend");
@@ -764,6 +807,21 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
+    use super::parse_address;
+
+    #[test]
+    fn parses_typed_addresses() {
+        let p = |t| parse_address(t, Some("192.168.1.20"));
+        assert_eq!(p("192.168.1.57"), Ok(("192.168.1.57".into(), 53319)));
+        assert_eq!(p(" 10.0.0.5:6000 "), Ok(("10.0.0.5".into(), 6000)));
+        assert_eq!(p("#57"), Ok(("192.168.1.57".into(), 53319)));
+        assert_eq!(p("57"), Ok(("192.168.1.57".into(), 53319)));
+        assert!(p("hello").is_err());
+        assert!(p("300").is_err());
+        assert!(p("10.0.0.5:x").is_err());
+        assert!(parse_address("57", None).is_err());
+    }
+
     /// Needs a receiver running on this machine: `cargo test -- --ignored`
     #[tokio::test]
     #[ignore]

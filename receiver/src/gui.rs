@@ -425,6 +425,9 @@ impl ReceiverApp {
                 self.pairing_panel(ui);
             } else {
                 ui.label(RichText::new("Open ScanSend on your phone and tap this computer to connect.").color(t().dim));
+                if let Some(ip) = self.ips.first() {
+                    ui.label(RichText::new(format!("Not listed on the phone? Tap \"Add by address\" there and enter {ip}")).size(13.0).color(t().dim));
+                }
                 ui.set_max_width(460.0);
                 self.firewall_hint(ui);
             }

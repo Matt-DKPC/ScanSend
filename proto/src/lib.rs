@@ -1,7 +1,8 @@
 //! ScanSend wire protocol.
 //!
 //! Discovery (UDP, like LocalSend):
-//!   phone  -> multicast 239.255.83.83:53318 and broadcast 255.255.255.255:53318
+//!   phone  -> multicast 224.0.0.168:53318 and 239.255.83.83:53318, and broadcast
+//!             255.255.255.255:53318
 //!             `{"t":"query","v":1}`
 //!   PC     -> unicast reply to the sender's address
 //!             `{"t":"announce","v":1,"id":"...","name":"Flaky USB","port":53319}`
@@ -37,8 +38,15 @@ use std::net::Ipv4Addr;
 pub const PROTOCOL_VERSION: u32 = 1;
 pub const DISCOVERY_PORT: u16 = 53318;
 pub const DEFAULT_HTTP_PORT: u16 = 53319;
-/// Administratively scoped (LAN-only) multicast group.
+/// Administratively scoped (LAN-only) multicast group, used up to 0.4.7.
 pub const MULTICAST_ADDR: Ipv4Addr = Ipv4Addr::new(239, 255, 83, 83);
+/// Link-local multicast group (next to LocalSend's 224.0.0.167). Switches flood
+/// 224.0.0.0/24 instead of filtering it, and some Android phones only handle
+/// multicast in this range, so it gets through where 239.x is dropped.
+pub const MULTICAST_ADDR_LINK: Ipv4Addr = Ipv4Addr::new(224, 0, 0, 168);
+/// Every group computers listen on and phones ask on; both, so old and new
+/// versions still find each other.
+pub const MULTICAST_GROUPS: [Ipv4Addr; 2] = [MULTICAST_ADDR_LINK, MULTICAST_ADDR];
 /// Longest scan payload accepted. QR codes top out around 7 KB of numeric data.
 pub const MAX_SCAN_LEN: usize = 8 * 1024;
 
