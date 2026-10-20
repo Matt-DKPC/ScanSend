@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+# Signing team IDs are stripped on commit (filter set up locally on the Mac).
+mobile/src-tauri/gen/apple/project.yml filter=strip-team
+mobile/src-tauri/gen/apple/scansend-app.xcodeproj/project.pbxproj filter=strip-team

@@ -1,0 +1,346 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0E316967E9AE34D3276819A0 /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = B4B335FE2071DFAA15678E10 /* libapp.a */; };
+		17FBA18D25629804C8BA3E53 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 9B2AC30013BB0A30D0F51F05 /* LaunchScreen.storyboard */; };
+		407C57365C9B04271C0FFCA7 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8418D274B752E6D202FC41B3 /* Security.framework */; };
+		526E27DD1EE8D45FA7D1D2BB /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E5FD2AA011D5700A772C4013 /* CoreGraphics.framework */; };
+		5327B2B4B9CF7434483A0678 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5221AA2503E4ABD947A7C553 /* Assets.xcassets */; };
+		68452A33A0DA977A4B4BD630 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 3045045298E693AE8AA42113 /* assets */; };
+		7A4FE5EC709695753E504A91 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 06CF8E3301630C4EE1E734CD /* UIKit.framework */; };
+		9160E0306B7CFCE28CB0AB75 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DE2CA3D916AEB63A84249820 /* MetalKit.framework */; };
+		AC349CF1DC1B680474EC2FEA /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1EC35CF432D2385AC8A84735 /* Metal.framework */; };
+		B9EBA3F80D83BFE43159638E /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 89D6D6D830856240AAB16BB4 /* WebKit.framework */; };
+		C182A20EE0AA5FA0C3FFADE4 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 393FAA09887B3721E7B1271F /* main.mm */; };
+		EBC7715C5FBE63A0C7E51EF6 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 236BB2C01551C6C4A3286367 /* QuartzCore.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		06CF8E3301630C4EE1E734CD /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		1EC35CF432D2385AC8A84735 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		236BB2C01551C6C4A3286367 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		3045045298E693AE8AA42113 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
+		393FAA09887B3721E7B1271F /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		4FA7509CC358A3E4318D637E /* scansend-app_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "scansend-app_iOS.entitlements"; sourceTree = "<group>"; };
+		5221AA2503E4ABD947A7C553 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		56A7830E2CCC2F56AB022ED6 /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		69EC6F72A035B77BF7E9536A /* scansend-app_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "scansend-app_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		8418D274B752E6D202FC41B3 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		859E73B846B3A48B92D19167 /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
+		89D6D6D830856240AAB16BB4 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		9910A717FC622295BDDD1F54 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
+		9B2AC30013BB0A30D0F51F05 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		B4B335FE2071DFAA15678E10 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
+		DE2CA3D916AEB63A84249820 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		E5FD2AA011D5700A772C4013 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		F481757AEDBCE6BDC6AF6005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		F8B0CF320DE23479C965B78C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0E316967E9AE34D3276819A0 /* libapp.a in Frameworks */,
+				526E27DD1EE8D45FA7D1D2BB /* CoreGraphics.framework in Frameworks */,
+				AC349CF1DC1B680474EC2FEA /* Metal.framework in Frameworks */,
+				9160E0306B7CFCE28CB0AB75 /* MetalKit.framework in Frameworks */,
+				EBC7715C5FBE63A0C7E51EF6 /* QuartzCore.framework in Frameworks */,
+				407C57365C9B04271C0FFCA7 /* Security.framework in Frameworks */,
+				7A4FE5EC709695753E504A91 /* UIKit.framework in Frameworks */,
+				B9EBA3F80D83BFE43159638E /* WebKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		2D8E36619226B1DCD672C3DF /* Externals */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Externals;
+			sourceTree = "<group>";
+		};
+		3E16F795F5FC557EE2E54972 /* scansend-app */ = {
+			isa = PBXGroup;
+			children = (
+				393FAA09887B3721E7B1271F /* main.mm */,
+				EE77F723C55DD08CA92EC9C1 /* bindings */,
+			);
+			path = "scansend-app";
+			sourceTree = "<group>";
+		};
+		855DC3F403A0672820A44A6D = {
+			isa = PBXGroup;
+			children = (
+				3045045298E693AE8AA42113 /* assets */,
+				5221AA2503E4ABD947A7C553 /* Assets.xcassets */,
+				9B2AC30013BB0A30D0F51F05 /* LaunchScreen.storyboard */,
+				2D8E36619226B1DCD672C3DF /* Externals */,
+				AB4ABC0D3C3C4FDB7D11CDE4 /* scansend-app_iOS */,
+				E1344ACEAE525622F56E06C7 /* Sources */,
+				DDF23783DF093E2AA75E688B /* src */,
+				C534DA4735DC6D5881701A84 /* Frameworks */,
+				8D2F876558C4F9B5D6D7AB2F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		8D2F876558C4F9B5D6D7AB2F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				69EC6F72A035B77BF7E9536A /* scansend-app_iOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AB4ABC0D3C3C4FDB7D11CDE4 /* scansend-app_iOS */ = {
+			isa = PBXGroup;
+			children = (
+				F481757AEDBCE6BDC6AF6005 /* Info.plist */,
+				4FA7509CC358A3E4318D637E /* scansend-app_iOS.entitlements */,
+			);
+			path = "scansend-app_iOS";
+			sourceTree = "<group>";
+		};
+		C534DA4735DC6D5881701A84 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				E5FD2AA011D5700A772C4013 /* CoreGraphics.framework */,
+				B4B335FE2071DFAA15678E10 /* libapp.a */,
+				1EC35CF432D2385AC8A84735 /* Metal.framework */,
+				DE2CA3D916AEB63A84249820 /* MetalKit.framework */,
+				236BB2C01551C6C4A3286367 /* QuartzCore.framework */,
+				8418D274B752E6D202FC41B3 /* Security.framework */,
+				06CF8E3301630C4EE1E734CD /* UIKit.framework */,
+				89D6D6D830856240AAB16BB4 /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		DDF23783DF093E2AA75E688B /* src */ = {
+			isa = PBXGroup;
+			children = (
+				859E73B846B3A48B92D19167 /* lib.rs */,
+				56A7830E2CCC2F56AB022ED6 /* main.rs */,
+			);
+			name = src;
+			path = ../../src;
+			sourceTree = "<group>";
+		};
+		E1344ACEAE525622F56E06C7 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				3E16F795F5FC557EE2E54972 /* scansend-app */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		EE77F723C55DD08CA92EC9C1 /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				9910A717FC622295BDDD1F54 /* bindings.h */,
+			);
+			path = bindings;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		9CA3491E03F8892D9244B8E7 /* scansend-app_iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0FC2632CB0ECFF5CEF1AA6B0 /* Build configuration list for PBXNativeTarget "scansend-app_iOS" */;
+			buildPhases = (
+				08CE62452DB28F50A2B23E2D /* Build Rust Code */,
+				A897D7406E3483F8B75AFA07 /* Sources */,
+				53BE469CBD8A87C746D617F7 /* Resources */,
+				F8B0CF320DE23479C965B78C /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "scansend-app_iOS";
+			packageProductDependencies = (
+			);
+			productName = "scansend-app_iOS";
+			productReference = 69EC6F72A035B77BF7E9536A /* scansend-app_iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A9B797CEC6744A0CE91C2DE8 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					9CA3491E03F8892D9244B8E7 = {
+						DevelopmentTeam = "";
+					};
+				};
+			};
+			buildConfigurationList = 0F431AB06235B8BD079B45C5 /* Build configuration list for PBXProject "scansend-app" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 855DC3F403A0672820A44A6D;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 8D2F876558C4F9B5D6D7AB2F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				9CA3491E03F8892D9244B8E7 /* scansend-app_iOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		53BE469CBD8A87C746D617F7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5327B2B4B9CF7434483A0678 /* Assets.xcassets in Resources */,
+				17FBA18D25629804C8BA3E53 /* LaunchScreen.storyboard in Resources */,
+				68452A33A0DA977A4B4BD630 /* assets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		08CE62452DB28F50A2B23E2D /* Build Rust Code */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust Code";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a",
+				"$(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "npm run -- tauri ios xcode-script -v --platform \"${PLATFORM_DISPLAY_NAME:?}\" --sdk-root \"${SDKROOT:?}\" --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration \"${CONFIGURATION:?}\" ${FORCE_COLOR} ${ARCHS:?}\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A897D7406E3483F8B75AFA07 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C182A20EE0AA5FA0C3FFADE4 /* main.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		30982FF18C3B637E3A57CD99 /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				SDKROOT = iphoneos;
+			};
+			name = release;
+		};
+		670CB4D6A940013D34687AD3 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				CODE_SIGN_ENTITLEMENTS = "scansend-app_iOS/scansend-app_iOS.entitlements";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = "scansend-app_iOS/Info.plist";
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = dev.scansend.app;
+				PRODUCT_NAME = "ScanSend";
+				VALID_ARCHS = arm64;
+			};
+			name = debug;
+		};
+		6DB7322F56150C239AA85847 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				SDKROOT = iphoneos;
+			};
+			name = debug;
+		};
+		A9F174F1EF9C3B66F382386F /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				CODE_SIGN_ENTITLEMENTS = "scansend-app_iOS/scansend-app_iOS.entitlements";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = "scansend-app_iOS/Info.plist";
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = dev.scansend.app;
+				PRODUCT_NAME = "ScanSend";
+				VALID_ARCHS = arm64;
+			};
+			name = release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0F431AB06235B8BD079B45C5 /* Build configuration list for PBXProject "scansend-app" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6DB7322F56150C239AA85847 /* debug */,
+				30982FF18C3B637E3A57CD99 /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+		0FC2632CB0ECFF5CEF1AA6B0 /* Build configuration list for PBXNativeTarget "scansend-app_iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				670CB4D6A940013D34687AD3 /* debug */,
+				A9F174F1EF9C3B66F382386F /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A9B797CEC6744A0CE91C2DE8 /* Project object */;
+}

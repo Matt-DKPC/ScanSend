@@ -104,11 +104,11 @@ npx tauri android build --apk --debug --target aarch64
 
 ```sh
 cd mobile && npm install
-npx tauri ios init
 APPLE_DEVELOPMENT_TEAM=<your team id> npx tauri ios build --debug
 ```
 
-then install it from Xcode (open `mobile/src-tauri/gen/apple/*.xcodeproj` and press ▶).
+The Xcode project is in the repo (`mobile/src-tauri/gen/apple`), so there's no `ios init` step.
+Then install it from Xcode (open `mobile/src-tauri/gen/apple/*.xcodeproj` and press ▶).
 Apps installed with a free Apple ID need reinstalling every 7 days.
 
 ## How the phone finds the computer
