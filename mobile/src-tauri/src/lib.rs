@@ -254,8 +254,15 @@ async fn reach_patiently(hosts: &[String], port: u16) -> Result<(String, String)
 /// Every computer on the Wi-Fi: UDP announcements plus, like LocalSend, asking
 /// each address of the phone's /24 directly. The direct check is what works on
 /// iPhone, where UDP broadcast needs an entitlement from Apple.
-async fn find_computers(wait: Duration) -> Vec<Found> {
-    let (udp, scanned) = tokio::join!(discover_inner(wait), scan_subnet());
+async fn find_computers(wait: Duration, state: &AppState) -> Vec<Found> {
+    // Paired computers' networks too: on a big 10.x network the PCs may be far
+    // outside the phone's own part, but once one is added by address, the
+    // others next to it show up by themselves.
+    let known: Vec<Ipv4Addr> = {
+        let s = state.saved.lock().unwrap();
+        s.receivers.iter().flat_map(|r| std::iter::once(&r.host).chain(&r.alt_hosts)).filter_map(|h| h.parse().ok()).collect()
+    };
+    let (udp, scanned) = tokio::join!(discover_inner(wait), scan_subnet(known));
     let mut found = udp.unwrap_or_default();
     for f in scanned {
         if !found.iter().any(|g| g.id == f.id) {
@@ -266,19 +273,63 @@ async fn find_computers(wait: Duration) -> Vec<Found> {
     found
 }
 
-async fn scan_subnet() -> Vec<Found> {
-    let Some(Ok(IpAddr::V4(me))) = local_ip(None).map(|ip| ip.parse::<IpAddr>()) else { return Vec::new() };
-    let [a, b, c, mine] = me.octets();
+/// Never scan more than a /20 (4094 addresses): bigger networks would take
+/// minutes. A computer beyond that is added by address.
+const WIDEST_SCAN: u8 = 20;
+/// Connections open at once while scanning; iPhone apps get only 256 files.
+const SCAN_AT_ONCE: usize = 200;
+
+/// The phone's address and the size of its network (prefix length), so
+/// discovery covers the real subnet rather than assuming a /24. Business
+/// networks are often /22 or /16, with phones and PCs in different /24s.
+fn local_net() -> Option<(Ipv4Addr, u8)> {
+    let me: Ipv4Addr = local_ip(None)?.parse().ok()?;
+    let prefix = if_addrs::get_if_addrs()
+        .unwrap_or_default()
+        .into_iter()
+        .find_map(|i| match i.addr {
+            if_addrs::IfAddr::V4(v4) if v4.ip == me => Some(v4.prefixlen),
+            _ => None,
+        })
+        .unwrap_or(24);
+    Some((me, prefix))
+}
+
+/// Addresses to ask: the phone's own /24 first, then the /24 of each `known`
+/// computer, then the rest of the subnet (at most a /20 around the phone).
+fn scan_hosts(me: Ipv4Addr, prefix: u8, known: &[Ipv4Addr]) -> Vec<Ipv4Addr> {
+    let bits = 32 - u32::from(prefix.clamp(WIDEST_SCAN, 24));
+    let net = u32::from(me) >> bits << bits;
+    let mut hosts: Vec<u32> = (net + 1..net + (1 << bits) - 1).collect();
+    let own24 = u32::from(me) >> 8;
+    let mut known24: Vec<u32> = known.iter().filter(|k| k.is_private()).map(|k| u32::from(*k) >> 8).collect();
+    known24.sort_unstable();
+    known24.dedup();
+    for k in &known24 {
+        if (k << 8) < net || (k << 8) >= net + (1 << bits) {
+            hosts.extend((k << 8) + 1..(k << 8) + 255);
+        }
+    }
+    hosts.retain(|h| *h != u32::from(me));
+    hosts.sort_by_key(|h| (h >> 8 != own24, known24.binary_search(&(h >> 8)).is_err()));
+    hosts.into_iter().map(Ipv4Addr::from).collect()
+}
+
+async fn scan_subnet(known: Vec<Ipv4Addr>) -> Vec<Found> {
+    let Some((me, prefix)) = local_net() else { return Vec::new() };
     let client = reqwest::Client::builder()
         .connect_timeout(Duration::from_millis(800))
         .timeout(Duration::from_millis(1500))
         .build()
         .expect("http client");
+    let slots = std::sync::Arc::new(tokio::sync::Semaphore::new(SCAN_AT_ONCE));
     let mut set = tokio::task::JoinSet::new();
-    for d in (1..=254u8).filter(|d| *d != mine) {
+    for ip in scan_hosts(me, prefix, &known) {
         let client = client.clone();
+        let slots = slots.clone();
         set.spawn(async move {
-            let host = Ipv4Addr::new(a, b, c, d).to_string();
+            let _slot = slots.acquire_owned().await.ok()?;
+            let host = ip.to_string();
             let info: Info = client
                 .get(format!("http://{host}:{DEFAULT_HTTP_PORT}/api/v1/info"))
                 .send()
@@ -313,6 +364,10 @@ async fn discover_inner(wait: Duration) -> Result<Vec<Found>, String> {
         .map_err(|e| e.to_string())?;
     let _ = sock.set_broadcast(true);
     let q = Discovery::query().to_bytes();
+    // Some routers pass the subnet's own broadcast (e.g. 10.0.3.255) but not 255.255.255.255.
+    let subnet_broadcast = local_net()
+        .filter(|(_, p)| (8..=30).contains(p))
+        .map(|(me, p)| Ipv4Addr::from(u32::from(me) | (u32::MAX >> p)));
 
     // Ask a few times; UDP on Wi-Fi drops packets.
     let deadline = tokio::time::Instant::now() + wait;
@@ -325,6 +380,9 @@ async fn discover_inner(wait: Duration) -> Result<Vec<Found>, String> {
                 let _ = sock.send_to(&q, (group, DISCOVERY_PORT)).await;
             }
             let _ = sock.send_to(&q, (Ipv4Addr::BROADCAST, DISCOVERY_PORT)).await;
+            if let Some(b) = subnet_broadcast {
+                let _ = sock.send_to(&q, (b, DISCOVERY_PORT)).await;
+            }
             next_send += Duration::from_millis(400);
         }
         let until = next_send.min(deadline);
@@ -468,7 +526,7 @@ async fn drop_unpaired(found: &[Found], state: &AppState) {
 
 #[tauri::command]
 async fn discover(state: State<'_, AppState>) -> Result<Vec<Found>, String> {
-    let mut found = find_computers(Duration::from_millis(1500)).await;
+    let mut found = find_computers(Duration::from_millis(1500), &state).await;
     drop_unpaired(&found, &state).await;
     let mut s = state.saved.lock().unwrap();
     let mut changed = false;
@@ -716,7 +774,7 @@ async fn send_scan(text: String, format: Option<String>, state: State<'_, AppSta
             }
             // 2. Its IP changed (DHCP): find it again by its id.
             if new_addr.is_none() {
-                if let Some(f) = find_computers(Duration::from_millis(1200)).await.into_iter().find(|f| f.id == target.id) {
+                if let Some(f) = find_computers(Duration::from_millis(1200), &state).await.into_iter().find(|f| f.id == target.id) {
                     new_addr = Some((f.host, f.port));
                 }
             }
@@ -807,8 +865,36 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_address;
+    use super::{parse_address, scan_hosts};
+    use std::net::Ipv4Addr;
 
+    #[test]
+    fn scans_the_real_subnet() {
+        let me = Ipv4Addr::new(10, 0, 5, 20);
+        // A /24 stays a /24.
+        let h = scan_hosts(me, 24, &[]);
+        assert_eq!(h.len(), 253);
+        assert!(h.iter().all(|h| h.octets()[..3] == [10, 0, 5]));
+        // A /22 covers 10.0.4.1 - 10.0.7.254, own /24 first.
+        let h = scan_hosts(me, 22, &[]);
+        assert_eq!(h.len(), 1021);
+        assert!(h[..253].iter().all(|h| h.octets()[2] == 5));
+        assert!(h.contains(&Ipv4Addr::new(10, 0, 4, 255)));
+        assert!(h.contains(&Ipv4Addr::new(10, 0, 7, 254)));
+        assert!(!h.contains(&me) && !h.contains(&Ipv4Addr::new(10, 0, 7, 255)));
+        // A /16 is capped to the /20 around the phone.
+        let h = scan_hosts(me, 16, &[]);
+        assert_eq!(h.len(), 4093);
+        assert!(h.iter().all(|h| (0..16).contains(&h.octets()[2])));
+        // Tiny networks still get their /24.
+        assert_eq!(scan_hosts(me, 28, &[]).len(), 253);
+        // A paired computer far away on a 10.x network: its /24 comes right after the phone's.
+        let pc = Ipv4Addr::new(10, 0, 200, 7);
+        let h = scan_hosts(me, 16, &[pc, pc, Ipv4Addr::new(10, 0, 5, 9), Ipv4Addr::new(8, 8, 8, 8)]);
+        assert_eq!(h.len(), 4093 + 254);
+        assert!(h[255..255 + 254].iter().all(|h| h.octets()[2] == 200));
+        assert!(h.contains(&pc) && !h.iter().any(|h| h.octets()[0] == 8));
+    }
     #[test]
     fn parses_typed_addresses() {
         let p = |t| parse_address(t, Some("192.168.1.20"));

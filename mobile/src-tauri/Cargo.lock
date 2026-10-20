@@ -1439,6 +1439,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "if-addrs"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0a05c691e1fae256cf7013d99dad472dc52d5543322761f83ec8d47eab40d2b"
+dependencies = [
+ "libc",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2592,9 +2602,10 @@ dependencies = [
 
 [[package]]
 name = "scansend-app"
-version = "0.4.8"
+version = "0.4.9"
 dependencies = [
  "hex",
+ "if-addrs",
  "rand",
  "reqwest 0.12.28",
  "scansend-proto",
@@ -2608,7 +2619,7 @@ dependencies = [
 
 [[package]]
 name = "scansend-proto"
-version = "0.4.8"
+version = "0.4.9"
 dependencies = [
  "serde",
  "serde_json",
