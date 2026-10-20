@@ -34,6 +34,9 @@
   server, no sign-up, no analytics, and it works without internet.
 - **Free, with no limits.** No scan caps, no per-computer licenses, no subscriptions.
 - **Connect by tapping a name.** No QR codes to scan, no IP addresses to type.
+- **Reads printed text too.** Switch the camera to **Text** for serial numbers that have no
+  barcode, like the ones on the back of an iPad. The likeliest serial is highlighted; tap other
+  words to pick them, or fix a misread letter before sending. Read on the phone, offline.
 - **See it before it's sent.** The camera freezes on the code in the box; nothing goes to the
   computer until you tap Send.
 - **Works where you work.** Android and iPhone phones; Windows, Linux and Mac computers.
@@ -112,11 +115,14 @@ Apps installed with a free Apple ID need reinstalling every 7 days.
 
 The computer answers "who's there?" messages on UDP 53318 and serves a small HTTP API on
 TCP 53319. The phone also checks each address on its Wi-Fi directly, which is what works on
-iPhone. Tapping a computer sends a connect request that waits until someone clicks Accept;
+iPhone: the whole subnet up to a /20 around the phone, plus the neighborhood of every computer
+it's paired with, so on big networks adding one computer by address brings in the ones near it. Tapping a computer sends a connect request that waits until someone clicks Accept;
 after that, every scan carries a token only that phone has. Details are in
 [`proto/src/lib.rs`](proto/src/lib.rs).
 
 ## License
 
 [MIT](LICENSE). Barcode reading on iPhone uses [ZXing](https://github.com/zxing-cpp/zxing-cpp)
-via [barcode-detector](https://github.com/Sec-ant/barcode-detector) (MIT).
+via [barcode-detector](https://github.com/Sec-ant/barcode-detector) (MIT). Text reading uses
+[Tesseract](https://github.com/tesseract-ocr/tesseract) via
+[tesseract.js](https://github.com/naptha/tesseract.js) with its English data (Apache-2.0).
