@@ -144,6 +144,11 @@
   #modeSwitch button { background: none; border: 0; color: #fff; padding: 0 14px; height: 38px;
     border-radius: 19px; font-size: 14px; font-weight: 600; }
   #modeSwitch button.on { background: var(--accent); color: var(--accent-ink); }
+  /* 1× / 2× / 5× zoom, bottom right of the camera. */
+  #zoomBar { position: absolute; right: 10px; bottom: 10px; z-index: 2; display: flex; gap: 6px; }
+  #zoomBar button { width: 40px; height: 40px; padding: 0; border-radius: 50%; border: 0;
+    background: rgba(0,0,0,.55); color: #fff; font-size: 13px; font-weight: 700; }
+  #zoomBar button.on { background: var(--accent); color: var(--accent-ink); }
   /* Text mode: a wide, short box fits a line of print, like a serial number. */
   #scanner.textmode #frame { width: 88%; height: 38%; }
   #held .txt[contenteditable] { outline: none; border-bottom: 1px dashed var(--line); }
@@ -252,6 +257,7 @@
       <button id="modeCode" class="on">Code</button><button id="modeText">Text</button>
     </div>
     <div id="camMsg"></div>
+    <div id="zoomBar" role="group" aria-label="Zoom" hidden></div>
   </div>
   <div id="held" class="none">Point the camera at a barcode or QR code</div>
   <div id="scanBar">
@@ -583,6 +589,7 @@ async function startCamera() {
   }
   const track = cam.stream.getVideoTracks()[0];
   try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch {}
+  setupZoom(track);
   video.srcObject = cam.stream;
   await video.play().catch(() => {});
   runDetection();
@@ -604,7 +611,47 @@ function showMode(mode) {
   $('home').hidden = mode === 'send';
   $('scanner').hidden = mode !== 'send';
   unfreeze();
+  applyZoom(mode === 'send' ? savedZoom() : 1);
   $('video').play().catch(() => {});
+}
+
+// ---- zoom ----
+// 1× / 2× / 5× on the scan page, for small print. Uses the camera's own zoom, so phones with a
+// telephoto lens switch to it (real detail, not just bigger pixels). "1×" is what the camera
+// starts at, since some report their normal lens as zoom 2 (ultra-wide being 1). Buttons only
+// show the steps the camera can do; the pairing square always uses 1×.
+const ZOOM_STEPS = [1, 2, 5];
+const zoom = { track: null, base: 1, steps: [], now: 1 };
+const savedZoom = () => Number(store.get('zoom')) || 1;
+
+function setupZoom(track) {
+  const bar = $('zoomBar');
+  bar.innerHTML = ''; bar.hidden = true;
+  zoom.track = null; zoom.steps = [];
+  let caps = {};
+  try { caps = track.getCapabilities ? track.getCapabilities() : {}; } catch {}
+  if (!caps.zoom || !(caps.zoom.max > caps.zoom.min)) return;
+  zoom.base = track.getSettings().zoom || caps.zoom.min || 1;
+  zoom.steps = ZOOM_STEPS.filter(z => zoom.base * z <= caps.zoom.max + 0.01);
+  if (zoom.steps.length < 2) return;
+  zoom.track = track;
+  for (const z of zoom.steps) {
+    const b = document.createElement('button');
+    b.textContent = z + '×';
+    b.setAttribute('aria-label', 'Zoom ' + z + ' times');
+    b.onclick = () => { store.set('zoom', z); applyZoom(z); };
+    bar.append(b);
+  }
+  bar.hidden = false;
+  applyZoom(cam.mode === 'send' ? savedZoom() : 1);
+}
+
+async function applyZoom(z) {
+  if (!zoom.track) return;
+  if (!zoom.steps.includes(z)) z = 1;
+  try { await zoom.track.applyConstraints({ advanced: [{ zoom: zoom.base * z }] }); } catch { return; }
+  zoom.now = z;
+  [...$('zoomBar').children].forEach((b, i) => b.classList.toggle('on', zoom.steps[i] === z));
 }
 
 async function openCamera(mode) {
