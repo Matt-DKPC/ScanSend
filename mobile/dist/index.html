@@ -138,20 +138,11 @@
     background: var(--panel); min-height: 64px; flex: none; }
   #held .txt { word-break: break-all; max-height: 3em; overflow: hidden; }
   #held.none { color: var(--dim); display: flex; align-items: center; justify-content: center; }
-  /* Code / Text switch, top right of the camera. */
-  #modeSwitch { position: absolute; top: calc(10px + env(safe-area-inset-top)); right: 10px; z-index: 2;
-    display: flex; background: rgba(0,0,0,.55); border-radius: 22px; padding: 3px; }
-  #modeSwitch button { background: none; border: 0; color: #fff; padding: 0 14px; height: 38px;
-    border-radius: 19px; font-size: 14px; font-weight: 600; }
-  #modeSwitch button.on { background: var(--accent); color: var(--accent-ink); }
   /* 1× / 2× / 5× zoom, bottom right of the camera. */
   #zoomBar { position: absolute; right: 10px; bottom: 10px; z-index: 2; display: flex; gap: 6px; }
   #zoomBar button { width: 40px; height: 40px; padding: 0; border-radius: 50%; border: 0;
     background: rgba(0,0,0,.55); color: #fff; font-size: 13px; font-weight: 700; }
   #zoomBar button.on { background: var(--accent); color: var(--accent-ink); }
-  /* Text mode: a wide, short box fits a line of print, like a serial number. */
-  #scanner.textmode #frame { width: 88%; height: 38%; }
-  #held .txt[contenteditable] { outline: none; border-bottom: 1px dashed var(--line); }
   #scanBar { display: flex; flex-direction: column; gap: 8px; padding: 12px 0 8px; flex: none; }
 
   .log { list-style: none; margin: 0; padding: 0; overflow: auto; flex: 1; min-height: 0; }
@@ -253,9 +244,6 @@
     <canvas id="still" hidden></canvas>
     <div id="frame"></div>
     <button id="exit" aria-label="Back to the main menu">✕</button>
-    <div id="modeSwitch" role="group" aria-label="What to scan">
-      <button id="modeCode" class="on">Code</button><button id="modeText">Text</button>
-    </div>
     <div id="camMsg"></div>
     <div id="zoomBar" role="group" aria-label="Zoom" hidden></div>
   </div>
@@ -357,9 +345,6 @@
 <!-- BarcodeDetector for phones that don't have it built in (iPhone): ZXing compiled to
      WebAssembly, bundled so it works offline. github.com/Sec-ant/barcode-detector (MIT). -->
 <script src="vendor/barcode-detector.js"></script>
-<!-- Text reading (serial numbers printed as text): Tesseract compiled to WebAssembly with its
-     English data, bundled so it works offline. github.com/naptha/tesseract.js (Apache-2.0). -->
-<script src="vendor/tesseract/tesseract.min.js"></script>
 <script>
 const T = window.__TAURI__;
 const invoke = T.core.invoke;
@@ -751,9 +736,7 @@ function unfreeze() {
   $('still').hidden = true;
   $('scanner').classList.remove('frozen');
   $('held').className = 'none';
-  $('held').textContent = cam.text && cam.mode === 'send'
-    ? 'Point the box at the serial number, or tap the picture to read any text'
-    : 'Point the camera at a barcode or QR code';
+  $('held').textContent = 'Point the camera at a barcode or QR code';
   $('shutter').disabled = true;
 }
 
@@ -763,11 +746,6 @@ function ignoreForNow(value) { cam.ignore = value; cam.ignoreSeen = performance.
 async function runDetection() {
   const id = ++cam.loop;
   while (cam.mode && id === cam.loop) {
-    if (cam.text && cam.mode === 'send') {
-      await textStep(id);
-      await sleep(150);
-      continue;
-    }
     let res = null;
     try { res = await detectInFrame(); } catch {}
     if (id !== cam.loop) return;
@@ -813,205 +791,11 @@ async function askToJoin(uri) {
   }
 }
 
-// ---- text mode ----
-// For serial numbers that are only printed as text (iPad backs, labels). Tesseract reads the
-// text in the box; when a word looks like a serial number the picture freezes with every word
-// outlined and that one picked. Tap words to pick others (several are sent in reading order),
-// tap away from the words to read again, or fix a misread letter in the box below.
-// Tapping the live picture reads whatever text is there, serial-looking or not.
-const TEXT_LOST_MS = 3000; // reading takes ~1 s, so "gone" takes longer than for codes
-const ocr = { loading: null, words: [], picked: [], base: null, force: false };
-cam.text = false;
-
-function ocrWorker() {
-  const at = (p) => new URL('vendor/tesseract/' + p, location.href).href;
-  ocr.loading = ocr.loading || Tesseract.createWorker('eng', 1, {
-    workerPath: at('worker.min.js'),
-    corePath: at('tesseract-core-simd-lstm.wasm.js'),
-    langPath: at('').replace(/\/$/, ''),
-    workerBlobURL: false,
-  }).then(async (w) => {
-    await w.setParameters({ tessedit_pageseg_mode: '11' }); // sparse text: words anywhere in the box
-    return w;
-  }).catch((e) => { ocr.loading = null; throw e; });
-  return ocr.loading;
-}
-
-async function setTextMode(on) {
-  cam.text = on;
-  store.set('scanText', on ? '1' : '0');
-  $('modeCode').classList.toggle('on', !on);
-  $('modeText').classList.toggle('on', on);
-  $('scanner').classList.toggle('textmode', on);
-  ocr.force = false;
-  unfreeze();
-  if (!on) { $('camMsg').textContent = ''; return; }
-  $('camMsg').textContent = 'Loading the text reader…';
-  try { await ocrWorker(); if (cam.text) $('camMsg').textContent = ''; }
-  catch (e) { toast("Couldn't start the text reader: " + errText(e), true); setTextMode(false); }
-}
-$('modeCode').onclick = () => setTextMode(false);
-$('modeText').onclick = () => setTextMode(true);
-
-// How much a word looks like a serial number: 8-14 capital letters and digits, mixing both.
-// Apple's are 10 or 12 long; a "Serial" label just before it settles it.
-const SERIAL_LABEL = /^(serial|s\/?n\b|sn\b|ser\.?\b)/i;
-function serialScore(w, before) {
-  if (!/^[A-Z0-9]{8,14}$/.test(w.value) || !/\d/.test(w.value) || !/[A-Z]/.test(w.value)) return 0;
-  let score = w.conf / 100;
-  if (w.value.length === 10 || w.value.length === 12) score += 0.5;
-  if (w.labeled || before.some(b => SERIAL_LABEL.test(b.text))) score += 2;
-  return score;
-}
-
-// Contrast stretch on a gray copy: etched serials are faint gray on gray.
-function enhance(ctx, w, h) {
-  const img = ctx.getImageData(0, 0, w, h), d = img.data, hist = new Uint32Array(256);
-  for (let i = 0; i < d.length; i += 4) {
-    const y = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
-    d[i] = y; hist[y]++;
-  }
-  const n = w * h; let lo = 0, hi = 255, acc = 0;
-  while (lo < 255 && (acc += hist[lo]) < n * 0.01) lo++;
-  acc = 0;
-  while (hi > 0 && (acc += hist[hi]) < n * 0.01) hi--;
-  const k = 255 / Math.max(1, hi - lo);
-  for (let i = 0; i < d.length; i += 4) {
-    const v = Math.max(0, Math.min(255, (d[i] - lo) * k));
-    d[i] = d[i + 1] = d[i + 2] = v;
-  }
-  ctx.putImageData(img, 0, 0);
-}
-
-// Read the text in the box. Words come back in reading order with boxes in full-image
-// coordinates, plus a copy of the frame they were read from (the camera moves meanwhile).
-const textCrop = document.createElement('canvas');
-async function readText() {
-  const video = $('video'), c = frameCrop();
-  if (!c) return null;
-  const base = document.createElement('canvas');
-  base.width = video.videoWidth; base.height = video.videoHeight;
-  base.getContext('2d').drawImage(video, 0, 0);
-  // Tesseract wants letters at least ~20 px tall: enlarge small crops.
-  const k = Math.min(2, Math.max(1, 1600 / c.sw));
-  textCrop.width = Math.round(c.sw * k); textCrop.height = Math.round(c.sh * k);
-  const ctx = textCrop.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(base, c.sx, c.sy, c.sw, c.sh, 0, 0, textCrop.width, textCrop.height);
-  enhance(ctx, textCrop.width, textCrop.height);
-  const { data } = await (await ocrWorker()).recognize(textCrop, {}, { blocks: true });
-  const words = [];
-  for (const b of data.blocks || []) for (const p of b.paragraphs) for (const l of p.lines) {
-    const line = [];
-    for (const w of l.words) {
-      const text = w.text.trim();
-      if (!text || w.confidence < 30 && text.length < 3) continue;
-      // "Serial:F9FX…" read as one word: keep the label apart from the number.
-      const m = text.match(/^(?:serial(?:\s*no\.?)?|s\/?n)[:.#]+(.+)$/i);
-      const word = {
-        text, conf: w.confidence, labeled: !!m,
-        value: (m ? m[1] : text).replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '') || text,
-        x: c.sx + w.bbox.x0 / k, y: c.sy + w.bbox.y0 / k,
-        w: (w.bbox.x1 - w.bbox.x0) / k, h: (w.bbox.y1 - w.bbox.y0) / k,
-      };
-      word.score = serialScore(word, line.slice(-2));
-      line.push(word);
-    }
-    words.push(...line);
-  }
-  return { words, base };
-}
-
-// One read of the live picture; freezes on a serial number (or on any text after a tap).
-async function textStep(id) {
-  if (cam.held || cam.prompting || !ocr.loading) return;
-  let res = null;
-  try { res = await readText(); } catch { return; }
-  if (id !== cam.loop || !cam.text || cam.held || !res) return;
-  const now = performance.now();
-  let best = -1;
-  res.words.forEach((w, i) => { if (w.score >= 0.9 && (best < 0 || w.score > res.words[best].score)) best = i; });
-  const value = best >= 0 ? res.words[best].value : null;
-  if (value && value === cam.ignore) cam.ignoreSeen = now;
-  if (cam.ignore && now - cam.ignoreSeen > TEXT_LOST_MS) cam.ignore = null;
-  const forced = ocr.force;
-  ocr.force = false;
-  if (forced) $('camMsg').textContent = '';
-  if (forced && !res.words.length) { toast('No text found in the box. Move closer or hold it steadier.', true); return; }
-  if (forced || (value && value !== cam.ignore)) freezeText(res, best);
-}
-
-function freezeText(res, pick) {
-  ocr.words = res.words; ocr.base = res.base;
-  ocr.picked = pick >= 0 ? [pick] : [];
-  const still = $('still');
-  still.width = res.base.width; still.height = res.base.height;
-  still.hidden = false;
-  $('scanner').classList.add('frozen');
-  cam.held = { content: '', format: 'TEXT' };
-  cam.heldSeen = performance.now();
-  showPicked();
-  vibrate(25);
-}
-
-// Redraw the frozen picture with the words outlined, and put the picked text below it.
-function showPicked() {
-  const still = $('still'), ctx = still.getContext('2d');
-  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#2f9e62';
-  ctx.drawImage(ocr.base, 0, 0);
-  const lw = Math.max(2, still.width / 400);
-  ocr.words.forEach((w, i) => {
-    const on = ocr.picked.includes(i);
-    ctx.lineWidth = on ? lw * 2 : lw;
-    ctx.strokeStyle = on ? accent : 'rgba(255,255,255,.75)';
-    if (on) { ctx.fillStyle = accent + '40'; ctx.fillRect(w.x - lw, w.y - lw, w.w + 2 * lw, w.h + 2 * lw); }
-    ctx.strokeRect(w.x - lw, w.y - lw, w.w + 2 * lw, w.h + 2 * lw);
-  });
-  const picked = [...ocr.picked].sort((a, b) => a - b).map(i => ocr.words[i]);
-  // One word is sent as cleaned up (no label or stray punctuation); several as read.
-  const text = picked.length === 1 ? picked[0].value : picked.map(w => w.text).join(' ');
-  cam.held.content = text;
-  $('shutter').disabled = !text;
-  const held = $('held');
-  if (!text) {
-    held.className = 'none';
-    held.textContent = 'Tap the words to send, or tap away from them to read again';
-    return;
-  }
-  held.className = '';
-  held.innerHTML = '<div class="txt" contenteditable="plaintext-only" spellcheck="false" autocapitalize="characters"></div>'
-    + '<small class="sub">TEXT · tap to fix a letter</small>';
-  const box = held.querySelector('.txt');
-  box.textContent = text;
-  box.oninput = () => { cam.held.content = box.textContent.trim(); $('shutter').disabled = !cam.held.content; };
-}
-
-// Taps on the camera picture in text mode: live → read now; frozen → pick a word or read again.
-$('cam').addEventListener('click', (e) => {
-  if (!cam.text || cam.mode !== 'send' || e.target.closest('button')) return;
-  if (!cam.held) {
-    if (!ocr.loading) return;
-    ocr.force = true;
-    $('camMsg').textContent = 'Reading…';
-    return;
-  }
-  const still = $('still'), view = still.getBoundingClientRect();
-  const scale = Math.max(view.width / still.width, view.height / still.height);
-  const x = (e.clientX - view.left - (view.width - still.width * scale) / 2) / scale;
-  const y = (e.clientY - view.top - (view.height - still.height * scale) / 2) / scale;
-  const pad = 14 / scale; // fingers are bigger than small print
-  const hit = ocr.words.findIndex(w => x >= w.x - pad && x <= w.x + w.w + pad && y >= w.y - pad && y <= w.y + w.h + pad);
-  if (hit < 0) { unfreeze(); return; }
-  ocr.picked = ocr.picked.includes(hit) ? ocr.picked.filter(i => i !== hit) : [...ocr.picked, hit];
-  showPicked();
-});
-
 // Send: deliver the held code, then back to the live view.
 $('shutter').onclick = () => {
   if (!cam.held || cam.held.content.startsWith(PAIR_PREFIX)) return;
   const { content, format } = cam.held;
-  // Text: don't freeze on the same serial again, even if a letter was fixed by hand.
-  const one = cam.text && ocr.picked.length === 1 ? ocr.words[ocr.picked[0]] : null;
-  ignoreForNow(one ? one.value : content);
+  ignoreForNow(content);
   unfreeze();
   sendScan(content, format);
 };
@@ -1036,10 +820,7 @@ async function fallbackScan(mode) {
   await sendScan(res.content, res.format); // the toast says whether it arrived
 }
 
-$('startScan').onclick = async () => {
-  await openCamera('send');
-  if (cam.mode === 'send' && (store.get('scanText') === '1') !== cam.text) setTextMode(!cam.text);
-};
+$('startScan').onclick = () => openCamera('send');
 $('connect').onclick = () => openCamera('pair');
 
 // ---- pairing ----

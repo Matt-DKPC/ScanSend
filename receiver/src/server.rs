@@ -43,7 +43,7 @@ pub struct AppState {
     pub cfg: Mutex<Config>,
     pub pin: Mutex<PinState>,
     pub recent_ids: Mutex<VecDeque<String>>,
-    pub actions: Mutex<mpsc::Sender<String>>,
+    pub actions: Mutex<mpsc::Sender<ScanEvent>>,
     pub status: Mutex<crate::backend::Status>,
     /// Newest first, capped at LOG_LEN.
     pub log: Mutex<VecDeque<ScanEvent>>,
@@ -396,17 +396,18 @@ async fn scan(State(s): State<Arc<AppState>>, headers: HeaderMap, Json(scan): Js
 
     let fmt = scan.format.clone().unwrap_or_else(|| "?".into());
     println!("  [{device}] {fmt}: {}", scan.text.escape_debug());
+    let ev = ScanEvent {
+        time: chrono::Local::now().format("%H:%M:%S").to_string(),
+        device,
+        format: fmt,
+        text: scan.text,
+    };
     {
         let mut log = s.log.lock().unwrap();
-        log.push_front(ScanEvent {
-            time: chrono::Local::now().format("%H:%M:%S").to_string(),
-            device,
-            format: fmt,
-            text: scan.text.clone(),
-        });
+        log.push_front(ev.clone());
         log.truncate(LOG_LEN);
     }
-    if s.actions.lock().unwrap().send(scan.text).is_err() {
+    if s.actions.lock().unwrap().send(ev).is_err() {
         return err(StatusCode::INTERNAL_SERVER_ERROR, "action thread stopped");
     }
     (s.on_change)();

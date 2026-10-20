@@ -1,13 +1,17 @@
 //! What happens on the computer when a scan arrives: type it like a USB
 //! barcode scanner (keyboard wedge) and/or put it on the clipboard.
 //!
-//! Both run on one dedicated OS thread: the keyboard/clipboard handles are
+//! Saving to the CSV file happens here too, off the network handlers.
+//!
+//! All of it runs on one dedicated OS thread: the keyboard/clipboard handles are
 //! not `Send`, and on Linux the clipboard contents only live as long as the
 //! process holding them, so we keep one `Clipboard` alive forever.
 
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
+use crate::server::ScanEvent;
 use std::sync::{mpsc, Arc, Mutex};
+use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -35,11 +39,14 @@ pub struct ActionOpts {
     pub type_text: bool,
     pub clipboard: bool,
     pub suffix: Suffix,
+    /// Add every scan to a CSV file (see csvlog).
+    #[serde(default)]
+    pub save_csv: bool,
 }
 
 impl Default for ActionOpts {
     fn default() -> Self {
-        ActionOpts { type_text: true, clipboard: true, suffix: Suffix::Enter }
+        ActionOpts { type_text: true, clipboard: true, suffix: Suffix::Enter, save_csv: false }
     }
 }
 
@@ -61,8 +68,8 @@ pub fn typeable(text: &str) -> String {
         .to_string()
 }
 
-pub fn spawn(opts: SharedOpts) -> mpsc::Sender<String> {
-    let (tx, rx) = mpsc::channel::<String>();
+pub fn spawn(opts: SharedOpts) -> mpsc::Sender<ScanEvent> {
+    let (tx, rx) = mpsc::channel::<ScanEvent>();
     std::thread::Builder::new()
         .name("scan-actions".into())
         .spawn(move || run(opts, rx))
@@ -70,14 +77,30 @@ pub fn spawn(opts: SharedOpts) -> mpsc::Sender<String> {
     tx
 }
 
-fn run(shared: SharedOpts, rx: mpsc::Receiver<String>) {
+fn run(shared: SharedOpts, rx: mpsc::Receiver<ScanEvent>) {
     use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 
     let mut clipboard: Option<arboard::Clipboard> = None;
     let mut enigo: Option<Enigo> = None;
+    let mut csv = crate::csvlog::Writer::default();
 
-    for text in rx {
+    loop {
+        // Rows waiting for the CSV file (open in Excel) are retried every few seconds.
+        let ev = match rx.recv_timeout(Duration::from_secs(5)) {
+            Ok(ev) => ev,
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                if csv.has_pending() {
+                    csv.flush();
+                }
+                continue;
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+        };
+        let text = &ev.text;
         let opts = *shared.lock().unwrap();
+        if opts.save_csv {
+            csv.add(&ev);
+        }
         if opts.clipboard {
             if clipboard.is_none() {
                 match arboard::Clipboard::new() {
@@ -102,7 +125,7 @@ fn run(shared: SharedOpts, rx: mpsc::Receiver<String>) {
                 }
             }
             if let Some(e) = enigo.as_mut() {
-                let t = typeable(&text);
+                let t = typeable(text);
                 let mut res = e.text(&t);
                 if res.is_ok() {
                     res = match opts.suffix {

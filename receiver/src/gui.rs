@@ -650,6 +650,24 @@ impl ReceiverApp {
             });
         });
         ui.checkbox(&mut o.clipboard, "Copy it to the clipboard");
+        ui.checkbox(&mut o.save_csv, "Save it to a CSV file (opens in Excel)");
+        if o.save_csv {
+            let p = crate::csvlog::path();
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(format!("   {}", p.display())).small().color(t().dim));
+                if p.exists() && ui.small_button("Open").clicked() {
+                    open_path(&p);
+                }
+                if let Some(dir) = p.parent().filter(|d| d.exists()) {
+                    if ui.small_button("Show folder").clicked() {
+                        open_path(dir);
+                    }
+                }
+            });
+            if let Some(e) = crate::csvlog::last_error() {
+                ui.label(RichText::new(e).color(Color32::LIGHT_RED).small());
+            }
+        }
         if o != before {
             *self.opts.lock().unwrap() = o;
             self.save_opts();
@@ -767,5 +785,19 @@ impl eframe::App for ReceiverApp {
         egui::CentralPanel::default().frame(pad(10, 20, 0, 16)).show(ui, |ui| self.scans_panel(ui));
         self.settings_window(&ctx);
         self.ask_window(&ctx);
+    }
+}
+
+/// Open a file or folder the way double-clicking it would.
+fn open_path(p: &std::path::Path) {
+    let program = if cfg!(windows) {
+        "explorer"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    if let Err(e) = std::process::Command::new(program).arg(p).spawn() {
+        eprintln!("could not open {}: {e}", p.display());
     }
 }

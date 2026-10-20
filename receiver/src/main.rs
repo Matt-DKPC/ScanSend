@@ -4,6 +4,7 @@
 mod actions;
 mod backend;
 mod config;
+mod csvlog;
 mod discovery;
 mod gui;
 mod net;
@@ -191,6 +192,9 @@ fn run_terminal(name: String, cfg: config::Config, opts: actions::SharedOpts, po
             (false, false) => "printed here only",
         }
     );
+    if o.save_csv {
+        println!("  Saving scans to {}", csvlog::path().display());
+    }
     println!("  Phones already paired: {}", cfg.devices.len());
 
     let state = make_state(

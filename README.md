@@ -34,9 +34,6 @@
   server, no sign-up, no analytics, and it works without internet.
 - **Free, with no limits.** No scan caps, no per-computer licenses, no subscriptions.
 - **Connect by tapping a name.** No QR codes to scan, no IP addresses to type.
-- **Reads printed text too.** Switch the camera to **Text** for serial numbers that have no
-  barcode, like the ones on the back of an iPad. The likeliest serial is highlighted; tap other
-  words to pick them, or fix a misread letter before sending. Read on the phone, offline.
 - **See it before it's sent.** The camera freezes on the code in the box; nothing goes to the
   computer until you tap Send.
 - **Works where you work.** Android and iPhone phones; Windows, Linux and Mac computers.
@@ -68,7 +65,11 @@ for ScanSend (local network only); on Linux, the window offers to open them for 
 The ⚙ button opens Settings:
 
 - **When a scan arrives:** type it into the active window, then press Enter, Tab or nothing;
-  copy it to the clipboard; or both.
+  copy it to the clipboard; save it to a CSV file; any mix of these.
+- **Save it to a CSV file:** every scan is added to `Documents/ScanSend/scans.csv`
+  (Date, Time, Phone, Format, Code), which opens in Excel. Barcodes with leading zeros stay
+  intact. You can keep the file open while scanning: if Excel has it locked, new scans wait
+  and are saved when you close it.
 - **Start ScanSend when I log in.**
 - **Themes:** the same seven as the phone app.
 
@@ -123,6 +124,4 @@ after that, every scan carries a token only that phone has. Details are in
 ## License
 
 [MIT](LICENSE). Barcode reading on iPhone uses [ZXing](https://github.com/zxing-cpp/zxing-cpp)
-via [barcode-detector](https://github.com/Sec-ant/barcode-detector) (MIT). Text reading uses
-[Tesseract](https://github.com/tesseract-ocr/tesseract) via
-[tesseract.js](https://github.com/naptha/tesseract.js) with its English data (Apache-2.0).
+via [barcode-detector](https://github.com/Sec-ant/barcode-detector) (MIT).
